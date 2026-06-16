@@ -1,0 +1,11 @@
+# Raw data directories (very large)
+토지이용/
+건축물대장/
+도로망/
+SGIS/
+
+# Python / Jupyter notebooks
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/

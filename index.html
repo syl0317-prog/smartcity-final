@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>수도권 지하철 등시간권(Isochrone) 공간 분석 시각화</title>
+  
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <style>
+    /* 디자인 시스템 변수 정의 */
+    :root {
+      --bg-color: #0f172a;
+      --panel-bg: rgba(30, 41, 59, 0.75);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-pangyo: #00f2fe;
+      --accent-cheongna: #ff007f;
+      --color-30m: #ff4d4d;
+      --color-60m: #ffa502;
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      --font-display: 'Outfit', 'Inter', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 상단 헤더 영역 */
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      flex-shrink: 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-title h1 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(to right, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.2rem;
+    }
+
+    .header-title p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* 통합 필터 컨트롤 바 */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 0.5rem 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--panel-border);
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .control-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* 필터 토글 버튼 스타일 */
+    .btn-toggle {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-toggle:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+
+    .btn-toggle.active[data-range="30"] {
+      background-color: rgba(255, 77, 77, 0.15);
+      border-color: var(--color-30m);
+      color: #ff6b6b;
+      box-shadow: 0 0 10px rgba(255, 77, 77, 0.2);
+    }
+
+    .btn-toggle.active[data-range="60"] {
+      background-color: rgba(255, 165, 2, 0.15);
+      border-color: var(--color-60m);
+      color: #ffa502;
+      box-shadow: 0 0 10px rgba(255, 165, 2, 0.2);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot-30 { background-color: var(--color-30m); }
+    .dot-60 { background-color: var(--color-60m); }
+
+    /* 화면 분할(Split Screen) 레이아웃 */
+    .split-container {
+      display: flex;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .pane {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--panel-border);
+    }
+
+    .pane:last-child {
+      border-right: none;
+    }
+
+    .map-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 지도 상단 오버레이 배지 */
+    .pane-badge {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--panel-border);
+      padding: 0.6rem 1rem;
+      border-radius: 0.75rem;
+      box-shadow: var(--shadow-lg);
+      pointer-events: none;
+    }
+
+    .pane-badge h2 {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 0.15rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pane-badge-pangyo h2 { color: var(--accent-pangyo); }
+    .pane-badge-cheongna h2 { color: var(--accent-cheongna); }
+
+    .pane-badge p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* 권역 통계 요약 카드 */
+    .stats-card {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1rem;
+      z-index: 1000;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      padding: 0.8rem 1.2rem;
+      border-radius: 0.75rem;
+      box-shadow: var(--shadow-lg);
+      width: 260px;
+      transition: all 0.3s ease;
+    }
+
+    .stats-card h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+      font-size: 0.85rem;
+    }
+
+    .stat-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-val {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    /* CORS 우회 드래그앤드롭 모달 오버레이 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(20px);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-content {
+      background: #1e293b;
+      border: 1px solid var(--panel-border);
+      padding: 2.5rem;
+      border-radius: 1.25rem;
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-content h2 {
+      font-family: var(--font-display);
+      margin-bottom: 0.5rem;
+      font-size: 1.5rem;
+      background: linear-gradient(to right, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .modal-content p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 0.75rem;
+      padding: 2.5rem 1.5rem;
+      cursor: pointer;
+      background-color: rgba(255, 255, 255, 0.02);
+      transition: all 0.3s ease;
+    }
+
+    .dropzone:hover {
+      border-color: #38bdf8;
+      background-color: rgba(56, 189, 248, 0.05);
+    }
+
+    .dropzone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .btn-file {
+      display: inline-block;
+      margin-top: 1rem;
+      background-color: #38bdf8;
+      color: #0f172a;
+      padding: 0.6rem 1.2rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-file:hover {
+      background-color: #0ea5e9;
+    }
+
+    /* 알림창 */
+    .notification {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      z-index: 10000;
+      background: rgba(30, 41, 59, 0.95);
+      border-left: 4px solid #38bdf8;
+      border-radius: 0.375rem;
+      padding: 0.8rem 1.2rem;
+      box-shadow: var(--shadow-lg);
+      transform: translateX(120%);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      font-size: 0.85rem;
+    }
+
+    .notification.show {
+      transform: translateX(0);
+    }
+
+    /* Leaflet 커스텀 팝업 스타일링 (다크 테마) */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 8px !important;
+      padding: 0.2rem !important;
+      box-shadow: var(--shadow-lg) !important;
+    }
+
+    .leaflet-popup-tip {
+      background: #1e293b !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .popup-body {
+      padding: 0.4rem 0.6rem;
+      min-width: 240px;
+    }
+
+    .popup-title {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 0.4rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 0.25rem;
+    }
+
+    .popup-meta {
+      font-size: 0.75rem;
+      color: #38bdf8;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    /* 팝업 테이블 스타일 (HTML Table) */
+    .popup-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .popup-table th, .popup-table td {
+      padding: 0.35rem 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .popup-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .popup-table td {
+      color: #e2e8f0;
+    }
+
+    .popup-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* 마커 호버 애니메이션을 위한 SVG transition 설정 */
+    .leaflet-interactive {
+      transition: r 0.2s ease-out, stroke-width 0.2s ease-out, fill-opacity 0.2s ease-out;
+    }
+
+    /* 동기화 배지 */
+    .sync-badge {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(6px);
+      padding: 0.3rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      pointer-events: none;
+    }
+
+    /* 모바일 대응 미디어 쿼리 (반응형 상하 스택) */
+    @media (max-width: 900px) {
+      .split-container {
+        flex-direction: column;
+      }
+      .pane {
+        height: 50%;
+        border-right: none;
+        border-bottom: 1px solid var(--panel-border);
+      }
+      body {
+        overflow: auto;
+      }
+      header {
+        flex-direction: column;
+        gap: 0.8rem;
+        align-items: stretch;
+      }
+      .controls {
+        justify-content: center;
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* 로더 스타일 */
+    .loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.85);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-radius: 50%;
+      border-top-color: #38bdf8;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 로딩 애니메이션 화면 -->
+  <div id="loader" class="loader">
+    <div class="spinner"></div>
+    <p style="font-size: 0.9rem; color: #94a3b8;">데이터를 분석 및 로드 중입니다...</p>
+  </div>
+
+  <!-- 로컬 브라우저 실행(file://) 시 출력될 CORS 우회 모달 창 -->
+  <div id="upload-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h2>지하철 등시간권 데이터 로드</h2>
+      <p>
+        브라우저의 보안 정책(CORS)으로 인해 로컬 파일 모드(file://)에서는 데이터 파일을 자동으로 읽어올 수 없습니다.<br>
+        생성된 <code>subway_isochrone.json</code> 파일을 아래 영역에 올려 놓아주세요.
+      </p>
+      <div id="dropzone" class="dropzone">
+        <span class="dropzone-icon">📂</span>
+        <p>subway_isochrone.json 파일을 드래그앤드롭</p>
+        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.5rem;">또는 영역을 클릭하여 선택</span>
+        <input type="file" id="file-input" accept=".json" class="hidden">
+      </div>
+      <label for="file-input" class="btn-file">파일 선택</label>
+      <p style="margin-top: 1.2rem; font-size: 0.75rem; color: #64748b;">
+        * GitHub Pages 등 웹 호스트 서버에 배포한 후에는 모달창 없이 자동으로 로드됩니다.
+      </p>
+    </div>
+  </div>
+
+  <!-- 우측 상단 토스트 알림창 -->
+  <div id="notification" class="notification">알림</div>
+
+  <!-- 헤더 바 -->
+  <header>
+    <div class="header-title">
+      <h1>METRO ISOCHRONE</h1>
+      <p>대중교통 등시간선 기반 주요 경제거점 접근성 비교</p>
+    </div>
+    
+    <!-- 등시간 범위 제어 컨트롤 -->
+    <div class="controls">
+      <span class="control-label">분석 범위</span>
+      <div class="control-group">
+        <button id="btn-30m" class="btn-toggle active" data-range="30">
+          <span class="dot dot-30"></span> 30분 이하
+        </button>
+        <button id="btn-60m" class="btn-toggle active" data-range="60">
+          <span class="dot dot-60"></span> 60분 이하
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 좌우 Split 스크린 맵 워크스페이스 -->
+  <div class="split-container">
+    
+    <!-- 좌측 판교 뷰어 -->
+    <div class="pane">
+      <div class="sync-badge">PANGYO</div>
+      <div class="pane-badge pane-badge-pangyo">
+        <h2>판교테크노밸리 생활권</h2>
+        <p>신분당선/경강선 판교역 출발 기준</p>
+      </div>
+      <div id="map-pangyo" class="map-container"></div>
+      
+      <!-- 판교 전용 통계 패널 -->
+      <div class="stats-card">
+        <h3>판교 권역 도달 통계</h3>
+        <div class="stat-row">
+          <span class="popup-label">30분 이내 도달 역:</span>
+          <span id="pangyo-count-30" class="stat-val" style="color: #ff6b6b;">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="popup-label">60분 이내 도달 역:</span>
+          <span id="pangyo-count-60" class="stat-val" style="color: #ffa502;">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="popup-label">총 통근 배후 인구:</span>
+          <span id="pangyo-tot-pop" class="stat-val" style="color: #38bdf8;">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측 청라 뷰어 -->
+    <div class="pane">
+      <div class="sync-badge">CHEONGNA</div>
+      <div class="pane-badge pane-badge-cheongna">
+        <h2>청라국제업무지구 생활권</h2>
+        <p>공항철도 청라국제도시역 출발 기준</p>
+      </div>
+      <div id="map-cheongna" class="map-container"></div>
+      
+      <!-- 청라 전용 통계 패널 -->
+      <div class="stats-card">
+        <h3>청라 권역 도달 통계</h3>
+        <div class="stat-row">
+          <span class="popup-label">30분 이내 도달 역:</span>
+          <span id="cheongna-count-30" class="stat-val" style="color: #ff6b6b;">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="popup-label">60분 이내 도달 역:</span>
+          <span id="cheongna-count-60" class="stat-val" style="color: #ffa502;">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="popup-label">총 통근 배후 인구:</span>
+          <span id="cheongna-tot-pop" class="stat-val" style="color: #38bdf8;">-</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Leaflet.js JS CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // 상태 관리 변수
+    let isochroneData = null;
+    let maps = { pangyo: null, cheongna: null };
+    let layerGroups = {
+      pangyo: { 30: null, 60: null },
+      cheongna: { 30: null, 60: null }
+    };
+    let activeRanges = { 30: true, 60: true };
+
+    // DOM 선택자
+    const loader = document.getElementById('loader');
+    const uploadModal = document.getElementById('upload-modal');
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const btn30m = document.getElementById('btn-30m');
+    const btn60m = document.getElementById('btn-60m');
+
+    // 1. 지도 초기화 및 타일 레이어(CartoDB Dark) 로드
+    function initMaps() {
+      const mapOptions = {
+        zoomControl: true,
+        attributionControl: true,
+        scrollWheelZoom: true
+      };
+
+      maps.pangyo = L.map('map-pangyo', mapOptions).setView([37.3948, 127.1114], 12);
+      maps.cheongna = L.map('map-cheongna', mapOptions).setView([37.5684, 126.6246], 12);
+
+      // 데이터가 돋보이도록 깔끔한 다크 맵 타일 적용
+      const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
+      L.tileLayer(tileUrl, { attribution: attribution, maxZoom: 19 }).addTo(maps.pangyo);
+      L.tileLayer(tileUrl, { attribution: attribution, maxZoom: 19 }).addTo(maps.cheongna);
+
+      // 필터 제어를 위한 독립 레이어 그룹 분리
+      layerGroups.pangyo[30] = L.layerGroup().addTo(maps.pangyo);
+      layerGroups.pangyo[60] = L.layerGroup().addTo(maps.pangyo);
+      layerGroups.cheongna[30] = L.layerGroup().addTo(maps.cheongna);
+      layerGroups.cheongna[60] = L.layerGroup().addTo(maps.cheongna);
+    }
+
+    // 2. 데이터 시각화 렌더링 총괄
+    function renderIsochrones() {
+      if (!isochroneData) return;
+
+      // 이전 마커 클리어
+      for (let core in layerGroups) {
+        for (let range in layerGroups[core]) {
+          layerGroups[core][range].clearLayers();
+        }
+      }
+
+      // 판교 & 청라 데이터 플로팅
+      renderCoreIsochrone('pangyo', isochroneData.pangyo_30, isochroneData.pangyo_60);
+      renderCoreIsochrone('cheongna', isochroneData.cheongna_30, isochroneData.cheongna_60);
+
+      // 통계 수치 업데이트
+      updateStats();
+    }
+
+    // 개별 경제거점별 데이터 플로팅
+    function renderCoreIsochrone(coreKey, data30, data60) {
+      const mapObj = maps[coreKey];
+      
+      // 30분 이내 도달 마커 렌더링
+      if (activeRanges[30]) {
+        data30.forEach(node => {
+          if (node.lat && node.lng) {
+            const marker = createCircleMarker(node, 30);
+            marker.addTo(layerGroups[coreKey][30]);
+          }
+        });
+      }
+
+      // 60분 이내 도달 마커 렌더링 (30분 초과 ~ 60분 이하)
+      if (activeRanges[60]) {
+        const idSet30 = new Set(data30.map(d => d.id));
+        const only60 = data60.filter(d => !idSet30.has(d.id));
+
+        only60.forEach(node => {
+          if (node.lat && node.lng) {
+            const marker = createCircleMarker(node, 60);
+            marker.addTo(layerGroups[coreKey][60]);
+          }
+        });
+      }
+
+      // 출발역 위치 탐색 및 지도 중앙 뷰 맞추기
+      const startNode = data30.find(d => d.time_seconds === 0);
+      if (startNode && startNode.lat && startNode.lng) {
+        mapObj.setView([startNode.lat, startNode.lng], 12);
+        
+        // 출발지에 대한 특수 강조 마커 배치
+        L.circleMarker([startNode.lat, startNode.lng], {
+          radius: 12,
+          fillColor: coreKey === 'pangyo' ? '#00f2fe' : '#ff007f',
+          color: '#ffffff',
+          weight: 3,
+          fillOpacity: 1.0,
+          pane: 'markerPane'
+        })
+        .addTo(mapObj)
+        .bindPopup(`
+          <div class="popup-body">
+            <div class="popup-title">🏁 ${startNode.name}역 (시작 거점)</div>
+            <div class="popup-meta">${startNode.line}</div>
+            <table class="popup-table">
+              <thead>
+                <tr><th>구분</th><th>지표 데이터</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>배후 종사자</td><td>${formatNumber(startNode.workers)}명</td></tr>
+                <tr><td>배후 인구</td><td>${formatNumber(startNode.population)}명</td></tr>
+              </tbody>
+            </table>
+          </div>
+        `);
+      }
+    }
+
+    // Leaflet Circle Marker 생성 및 테이블 형식 팝업 바인딩
+    function createCircleMarker(node, minutes) {
+      const color = minutes === 30 ? '#ff4d4d' : '#ffa502';
+      const radius = minutes === 30 ? 7 : 5;
+      const opacity = minutes === 30 ? 0.95 : 0.7;
+
+      const marker = L.circleMarker([node.lat, node.lng], {
+        radius: radius,
+        fillColor: color,
+        color: '#ffffff',
+        weight: 1,
+        fillOpacity: opacity
+      });
+
+      // 인구 통계 데이터 포맷팅
+      const popStr = node.population ? `${formatNumber(node.population)}명` : '정보 없음';
+      const workStr = node.workers ? `${formatNumber(node.workers)}명` : '정보 없음';
+
+      // 팝업 내부 HTML Table 구성
+      const popupHtml = `
+        <div class="popup-body">
+          <div class="popup-title">${node.name}역</div>
+          <div class="popup-meta">${node.line}</div>
+          <table class="popup-table">
+            <thead>
+              <tr>
+                <th>분석 지표</th>
+                <th>정보 값</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>소요 시간</td>
+                <td style="color: ${color}; font-weight: bold;">${node.time_minutes}분 (${formatNumber(node.time_seconds)}초)</td>
+              </tr>
+              <tr>
+                <td>배후 인구</td>
+                <td>${popStr}</td>
+              </tr>
+              <tr>
+                <td>배후 종사자수</td>
+                <td>${workStr}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml);
+      
+      // 마우스 오버(Hover) 시 부드럽게 크기가 늘어나는 인터랙션 구현
+      marker.on('mouseover', function() {
+        this.setStyle({
+          weight: 3,
+          radius: radius + 3
+        });
+      });
+      
+      marker.on('mouseout', function() {
+        this.setStyle({
+          weight: 1,
+          radius: radius
+        });
+      });
+
+      return marker;
+    }
+
+    // 3. 통계 카드 수치 연산 및 화면 갱신
+    function updateStats() {
+      if (!isochroneData) return;
+
+      // 판교 데이터 집계
+      document.getElementById('pangyo-count-30').innerText = `${isochroneData.pangyo_30.length}개역`;
+      document.getElementById('pangyo-count-60').innerText = `${isochroneData.pangyo_60.length}개역`;
+      let pangyoPop = 0;
+      isochroneData.pangyo_60.forEach(n => {
+        if (n.population) pangyoPop += n.population;
+      });
+      document.getElementById('pangyo-tot-pop').innerText = `${formatNumber(pangyoPop)}명`;
+
+      // 청라 데이터 집계
+      document.getElementById('cheongna-count-30').innerText = `${isochroneData.cheongna_30.length}개역`;
+      document.getElementById('cheongna-count-60').innerText = `${isochroneData.cheongna_60.length}개역`;
+      let cheongnaPop = 0;
+      isochroneData.cheongna_60.forEach(n => {
+        if (n.population) cheongnaPop += n.population;
+      });
+      document.getElementById('cheongna-tot-pop').innerText = `${formatNumber(cheongnaPop)}명`;
+    }
+
+    // 4. 숫자 쉼표 포맷 유틸리티
+    function formatNumber(num) {
+      if (num === null || num === undefined) return '-';
+      return num.toLocaleString('ko-KR');
+    }
+
+    // 5. 필터 토글 버튼 클릭 리스너 설정
+    btn30m.addEventListener('click', () => {
+      activeRanges[30] = !activeRanges[30];
+      btn30m.classList.toggle('active', activeRanges[30]);
+      renderIsochrones();
+      showNotification(`30분 범위 지도가 ${activeRanges[30] ? '표시' : '숨김'} 처리되었습니다.`);
+    });
+
+    btn60m.addEventListener('click', () => {
+      activeRanges[60] = !activeRanges[60];
+      btn60m.classList.toggle('active', activeRanges[60]);
+      renderIsochrones();
+      showNotification(`60분 범위 지도가 ${activeRanges[60] ? '표시' : '숨김'} 처리되었습니다.`);
+    });
+
+    // 토스트 알림창 출력
+    function showNotification(msg) {
+      const notify = document.getElementById('notification');
+      notify.innerText = msg;
+      notify.classList.add('show');
+      setTimeout(() => {
+        notify.classList.remove('show');
+      }, 3000);
+    }
+
+    function showLoading(show) {
+      loader.classList.toggle('hidden', !show);
+    }
+
+    // 6. 데이터 입출력 제어 및 CORS 우회 판정 분기 로직
+    async function loadData() {
+      showLoading(true);
+      const isLocalFile = window.location.protocol === 'file:';
+
+      // 만약 로컬 파일 시스템(file:///) 환경이 아니라, 웹 서버 혹은 GitHub Pages 환경인 경우
+      if (!isLocalFile) {
+        // 경로 1: 동일 루트 디렉토리 호출 (GitHub Pages 디폴트)
+        try {
+          const response = await fetch('subway_isochrone.json');
+          if (response.ok) {
+            isochroneData = await response.json();
+            renderIsochrones();
+            showLoading(false);
+            showNotification('JSON 데이터를 웹 서버에서 자동으로 가져왔습니다.');
+            return;
+          }
+        } catch (e) {
+          console.log("Failed path 1, attempting path 2...");
+        }
+
+        // 경로 2: 워크스페이스 구조상의 백업 디렉토리 호출
+        try {
+          const response = await fetch('subway_network/network/subway_isochrone.json');
+          if (response.ok) {
+            isochroneData = await response.json();
+            renderIsochrones();
+            showLoading(false);
+            showNotification('로컬 백업 경로에서 데이터를 자동 로드했습니다.');
+            return;
+          }
+        } catch (e) {
+          console.log("Failed backup path fetch.");
+        }
+      }
+
+      // 로컬 파일 실행 상태(file://)이거나 서버 fetch가 차단/실패한 경우 업로더 UI 활성화
+      showLoading(false);
+      uploadModal.classList.remove('hidden');
+    }
+
+    // 7. 업로더 드래그앤드롭 이벤트 바인딩
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '#38bdf8';
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.borderColor = 'rgba(255,255,255,0.15)';
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        handleFile(files[0]);
+      }
+    });
+
+    dropzone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    // 드롭되거나 선택된 JSON 파일 처리
+    function handleFile(file) {
+      if (!file.name.endsWith('.json')) {
+        alert('subway_isochrone.json 형식의 올바른 JSON 파일을 입력해주세요.');
+        return;
+      }
+
+      showLoading(true);
+      const reader = new FileReader();
+      
+      reader.onload = function(event) {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (!parsed.pangyo_30 || !parsed.cheongna_30) {
+            throw new Error("올바른 등시간권 데이터 구조(Key값 유실)가 아닙니다.");
+          }
+          isochroneData = parsed;
+          uploadModal.classList.add('hidden');
+          renderIsochrones();
+          showNotification('로컬 데이터를 수동 로드하여 지도를 활성화했습니다.');
+        } catch (e) {
+          alert('JSON 파일 해석 오류: ' + e.message);
+        } finally {
+          showLoading(false);
+        }
+      };
+      
+      reader.readAsText(file);
+    }
+
+    // 초기 시동기
+    window.addEventListener('DOMContentLoaded', () => {
+      initMaps();
+      loadData();
+    });
+  </script>
+</body>
+</html>
