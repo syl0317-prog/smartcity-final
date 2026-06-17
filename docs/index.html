@@ -805,7 +805,7 @@
     let cheongnaParcelsData = null;
     
     // Centers & Zooms
-    const pangyoCenter = [37.3995, 127.1047];
+    const pangyoCenter = [37.4019, 127.1089];
     const cheongnaCenter = [37.5270, 126.6450];
     const pangyoZoom = 15;
     const cheongnaZoom = 14;
@@ -1094,12 +1094,12 @@
     // Draw Target Bounding Box Rectangles
     function drawTargetRectangles() {
       // 1. Pangyo Target Rectangle
-      L.rectangle([[37.3975, 127.0962], [37.4015, 127.1132]], {
+      L.rectangle([[37.3950, 127.0980], [37.4060, 127.1200]], {
         color: '#ffffff',
         fillColor: '#38bdf8',
         fillOpacity: 0.02,
         weight: 2.5
-      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3975, 127.0962 ~ 37.4015, 127.1132");
+      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3950, 127.0980 ~ 37.4060, 127.1200");
 
       // 2. Cheongna Target Rectangle
       L.rectangle([[37.5150, 126.6300], [37.5390, 126.6600]], {

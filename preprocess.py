@@ -115,7 +115,7 @@ def main():
     # 3. Load Parcel Shapefiles & BBox Filter (to get PNUs first)
     # -------------------------------------------------------------
     print("[*] Loading parcel shapefiles...")
-    p_box_coords = [127.0962, 37.3975, 127.1132, 37.4015]
+    p_box_coords = [127.0980, 37.3950, 127.1200, 37.4060]
     c_box_coords = [126.6300, 37.5150, 126.6600, 37.5390]
     
     # Pangyo Parcels
