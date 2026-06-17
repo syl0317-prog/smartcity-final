@@ -116,7 +116,7 @@ def main():
     # -------------------------------------------------------------
     print("[*] Loading parcel shapefiles...")
     p_box_coords = [127.0962, 37.3975, 127.1132, 37.4015]
-    c_box_coords = [126.6386, 37.5344, 126.6578, 37.5434]
+    c_box_coords = [126.6300, 37.5150, 126.6600, 37.5390]
     
     # Pangyo Parcels
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
