@@ -99,6 +99,28 @@
       color: #38bdf8;
     }
 
+    .songpa-btn {
+      text-decoration: none;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border: 1px solid #10b981;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .songpa-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+
     /* 2. Global Comparison Table Card */
     .comparison-section {
       padding: 1.5rem 2rem 0.5rem 2rem;
@@ -589,8 +611,14 @@
       <h1>CITY COGNITION</h1>
       <p>판교 vs 청라 도시공간 분석 대시보드 (교통 인프라 & 토지이용 비교)</p>
     </div>
-    <div class="badge-container">
-      데이터 기준년도: 2024년
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+      <a href="./songpa/index.html" class="songpa-btn">
+        <span>송파구 데이터 뷰어 바로가기</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+      </a>
+      <div class="badge-container">
+        데이터 기준년도: 2024년
+      </div>
     </div>
   </header>
 
