@@ -805,7 +805,7 @@
     let cheongnaParcelsData = null;
     
     // Centers & Zooms
-    const pangyoCenter = [37.3949, 127.1116];
+    const pangyoCenter = [37.4030, 127.1050];
     const cheongnaCenter = [37.5396, 126.6479];
     const pangyoZoom = 15;
     const cheongnaZoom = 14;
@@ -1012,8 +1012,9 @@
             fillColor: color,
             fillOpacity: fillOpacity,
             weight: 2,
-            dashArray: color.includes('60m') ? '5, 5' : null
-          }).bindPopup(`<b>${label}</b>`);
+            dashArray: color.includes('60m') ? '5, 5' : null,
+            interactive: false // Prevent blocking click events on layers underneath
+          });
         }
         return null;
       }
@@ -1093,12 +1094,12 @@
     // Draw Target Bounding Box Rectangles
     function drawTargetRectangles() {
       // 1. Pangyo Target Rectangle
-      L.rectangle([[37.3920, 127.0980], [37.4020, 127.1200]], {
+      L.rectangle([[37.3980, 127.0950], [37.4080, 127.1150]], {
         color: '#ffffff',
         fillColor: '#38bdf8',
         fillOpacity: 0.02,
         weight: 2.5
-      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3920, 127.0980 ~ 37.4020, 127.1200");
+      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3980, 127.0950 ~ 37.4080, 127.1150");
 
       // 2. Cheongna Target Rectangle
       L.rectangle([[37.5250, 126.6300], [37.5520, 126.6680]], {
@@ -1138,24 +1139,12 @@
         },
         onEachFeature: function(feature, layer) {
           layer.bindPopup(createBuildingPopupHtml(feature.properties));
-          layer.on({
-            mouseover: function(e) {
-              const ly = e.target;
-              ly.setStyle({
-                fillOpacity: 1.0,
-                weight: 1.5,
-                color: '#ffffff'
-              });
-              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                ly.bringToFront();
-              }
-            },
-            mouseout: function(e) {
-              layers.cheongna.buildings.resetStyle(e.target);
-            }
-          });
         }
       }).addTo(maps.cheongna);
+      
+      // Ensure buildings always sit on top of polygons and parcels
+      if (layers.pangyo.buildings) layers.pangyo.buildings.bringToFront();
+      if (layers.cheongna.buildings) layers.cheongna.buildings.bringToFront();
     }
 
     // Popup builder for parcel features

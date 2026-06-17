@@ -204,10 +204,10 @@ def main():
     p_gdf = gpd.read_file(p_shp).to_crs(epsg=4326)
     p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith('4113510900')].copy()
     
-    # Cheongna Parcels (Filter by Dong Code 2826010700 - 청라동)
+    # Cheongna Parcels (Filter by Dong Code 2826012200 - 청라동)
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
     c_gdf = gpd.read_file(c_shp).to_crs(epsg=4326)
-    c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith('2826010700')].copy()
+    c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith('2826012200')].copy()
     
     p_pnus = set(p_box['PNU'].dropna().unique())
     c_pnus = set(c_box['PNU'].dropna().unique())
