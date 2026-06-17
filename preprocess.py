@@ -195,21 +195,19 @@ def main():
     print(f"[+] Saved comparison data to {comparison_output} and root")
     
     # -------------------------------------------------------------
-    # 6. Parcel Data Processing (SHP -> GeoJSON with Zoning Joined)
+    # 6. Parcel Data Processing (SHP -> GeoJSON with Zoning & Register Joined)
     # -------------------------------------------------------------
     print("[*] Processing parcel data...")
-    p_box_coords = [127.0980, 37.3920, 127.1200, 37.4020]
-    c_box_coords = [126.6300, 37.5250, 126.6680, 37.5520]
     
-    # Pangyo Parcels
+    # Pangyo Parcels (Filter by Dong Code 4113510900 - 삼평동)
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
     p_gdf = gpd.read_file(p_shp).to_crs(epsg=4326)
-    p_box = p_gdf.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
+    p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith('4113510900')].copy()
     
-    # Cheongna Parcels
+    # Cheongna Parcels (Filter by Dong Code 2826010700 - 청라동)
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
     c_gdf = gpd.read_file(c_shp).to_crs(epsg=4326)
-    c_box = c_gdf.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
+    c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith('2826010700')].copy()
     
     p_pnus = set(p_box['PNU'].dropna().unique())
     c_pnus = set(c_box['PNU'].dropna().unique())
@@ -246,6 +244,50 @@ def main():
     p_box['zoning'] = p_box['PNU'].map(p_zoning).fillna("지정정보없음")
     c_box['zoning'] = c_box['PNU'].map(c_zoning).fillna("지정정보없음")
     
+    # Clean building register datasets for merging
+    def build_pnu_from_register(df):
+        df = df.copy()
+        df['대지구분코드'] = df['대지구분코드'].fillna(0).astype(int)
+        df['번'] = df['번'].fillna(0).astype(int)
+        df['지'] = df['지'].fillna(0).astype(int)
+        df['시군구코드'] = df['시군구코드'].astype(str)
+        df['법정동코드_str'] = df['법정동코드'].astype(str).str.zfill(5)
+        
+        pnu_series = (
+            df['시군구코드'] + 
+            df['법정동코드_str'] + 
+            (df['대지구분코드'] + 1).astype(str) + 
+            df['번'].astype(str).str.zfill(4) + 
+            df['지'].astype(str).str.zfill(4)
+        )
+        df['PNU'] = pnu_series
+        return df
+        
+    p_b_clean = build_pnu_from_register(p_b_filtered)
+    p_b_clean = p_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
+    
+    c_b_clean = build_pnu_from_register(c_b_filtered)
+    c_b_clean = c_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
+    
+    # Merge Register info to Parcels (so parcel clicks show register info too)
+    p_box = p_box.merge(
+        p_b_clean[[
+            'PNU', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)', 
+            '지상층수', '사용승인일', '건물명'
+        ]], 
+        on='PNU', 
+        how='left'
+    )
+    
+    c_box = c_box.merge(
+        c_b_clean[[
+            'PNU', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)', 
+            '지상층수', '사용승인일', '건물명'
+        ]], 
+        on='PNU', 
+        how='left'
+    )
+    
     def to_geojson(gdf):
         features = []
         for idx, row in gdf.iterrows():
@@ -254,13 +296,44 @@ def main():
             jibun = row['JIBUN']
             zoning = row['zoning']
             
+            # Map attributes
+            use = row['주용도코드명'] if '주용도코드명' in row and pd.notna(row['주용도코드명']) else "정보없음"
+            area = float(row['연면적(㎡)']) if '연면적(㎡)' in row and pd.notna(row['연면적(㎡)']) else None
+            far = float(row['용적률(%)']) if '용적률(%)' in row and pd.notna(row['용적률(%)']) else None
+            lot_area = float(row['대지면적(㎡)']) if '대지면적(㎡)' in row and pd.notna(row['대지면적(㎡)']) else None
+            bc_ratio = float(row['건폐율(%)']) if '건폐율(%)' in row and pd.notna(row['건폐율(%)']) else None
+            floors_up = int(row['지상층수']) if '지상층수' in row and pd.notna(row['지상층수']) else 0
+            
+            app_y = row['사용승인일'] if '사용승인일' in row else None
+            if pd.notna(app_y):
+                try:
+                    app_y_str = str(int(float(app_y)))
+                    if len(app_y_str) >= 4:
+                        app_y_str = app_y_str[:4]
+                    else:
+                        app_y_str = "정보없음"
+                except Exception:
+                    app_y_str = "정보없음"
+            else:
+                app_y_str = "정보없음"
+                
+            name = row['건물명'] if '건물명' in row and pd.notna(row['건물명']) else "대지"
+            
             feature = {
                 "type": "Feature",
                 "geometry": json.loads(gpd.GeoSeries([geom]).to_json())['features'][0]['geometry'],
                 "properties": {
                     "pnu": pnu,
                     "jibun": jibun,
-                    "zoning": zoning
+                    "zoning": zoning,
+                    "name": name,
+                    "use": use,
+                    "area": area,
+                    "far": far,
+                    "lot_area": lot_area,
+                    "bc_ratio": bc_ratio,
+                    "floors_up": floors_up,
+                    "approved_year": app_y_str
                 }
             }
             features.append(feature)
@@ -299,50 +372,26 @@ def main():
     p_build_gdf = gpd.read_file(p_build_shp).to_crs(epsg=4326)
     c_build_gdf = gpd.read_file(c_build_shp).to_crs(epsg=4326)
     
-    p_build_box = p_build_gdf.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
-    c_build_box = c_build_gdf.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
-    
-    print(f"    Pangyo buildings in bbox: {len(p_build_box)}")
-    print(f"    Cheongna buildings in bbox: {len(c_build_box)}")
-    
-    # Spatial join with parcels to get PNU
-    p_build_centroids = p_build_box.copy()
-    p_build_centroids['geometry'] = p_build_box.centroid
-    p_joined = gpd.sjoin(p_build_centroids, p_box[['PNU', 'geometry']], how='left', predicate='within')
+    # Spatial join with parcels to filter by target Dong area and get PNU
+    print("    Joining OSM buildings with target dong parcels...")
+    p_build_centroids = p_build_gdf.copy()
+    p_build_centroids['geometry'] = p_build_gdf.centroid
+    p_joined = gpd.sjoin(p_build_centroids, p_box[['PNU', 'geometry']], how='inner', predicate='within')
+    p_build_box = p_build_gdf.loc[p_joined.index].copy()
     p_build_box['PNU'] = p_joined['PNU']
     
-    c_build_centroids = c_build_box.copy()
-    c_build_centroids['geometry'] = c_build_box.centroid
-    c_joined = gpd.sjoin(c_build_centroids, c_box[['PNU', 'geometry']], how='left', predicate='within')
+    c_build_centroids = c_build_gdf.copy()
+    c_build_centroids['geometry'] = c_build_gdf.centroid
+    c_joined = gpd.sjoin(c_build_centroids, c_box[['PNU', 'geometry']], how='inner', predicate='within')
+    c_build_box = c_build_gdf.loc[c_joined.index].copy()
     c_build_box['PNU'] = c_joined['PNU']
     
-    def build_pnu_from_register(df):
-        df = df.copy()
-        df['대지구분코드'] = df['대지구분코드'].fillna(0).astype(int)
-        df['번'] = df['번'].fillna(0).astype(int)
-        df['지'] = df['지'].fillna(0).astype(int)
-        df['시군구코드'] = df['시군구코드'].astype(str)
-        df['법정동코드_str'] = df['법정동코드'].astype(str).str.zfill(5)
-        
-        pnu_series = (
-            df['시군구코드'] + 
-            df['법정동코드_str'] + 
-            (df['대지구분코드'] + 1).astype(str) + 
-            df['번'].astype(str).str.zfill(4) + 
-            df['지'].astype(str).str.zfill(4)
-        )
-        df['PNU'] = pnu_series
-        return df
-        
-    p_b_clean = build_pnu_from_register(p_b_filtered)
-    p_b_clean = p_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
-    
-    c_b_clean = build_pnu_from_register(c_b_filtered)
-    c_b_clean = c_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
+    print(f"    Pangyo (Sampyeong-dong) buildings found: {len(p_build_box)}")
+    print(f"    Cheongna (Cheongna-dong) buildings found: {len(c_build_box)}")
     
     p_merged = p_build_box.merge(
         p_b_clean[[
-            'PNU', '건물명', '주용도코드명', '연면적(㎡)', '용적률(%)', 
+            'PNU', '건물명', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)',
             '지상층수', '지하층수', '사용승인일', '대지위치'
         ]], 
         on='PNU', 
@@ -351,7 +400,7 @@ def main():
     
     c_merged = c_build_box.merge(
         c_b_clean[[
-            'PNU', '건물명', '주용도코드명', '연면적(㎡)', '용적률(%)', 
+            'PNU', '건물명', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)',
             '지상층수', '지하층수', '사용승인일', '대지위치'
         ]], 
         on='PNU', 
@@ -395,6 +444,12 @@ def main():
             far = row['용적률(%)']
             far = float(far) if pd.notna(far) else None
             
+            lot_area = row['대지면적(㎡)']
+            lot_area = float(lot_area) if pd.notna(lot_area) else None
+            
+            bc_ratio = row['건폐율(%)']
+            bc_ratio = float(bc_ratio) if pd.notna(bc_ratio) else None
+            
             fl_up = row['지상층수']
             fl_up = int(fl_up) if pd.notna(fl_up) else 0
             fl_down = row['지하층수']
@@ -427,6 +482,8 @@ def main():
                     "use": use,
                     "area": area,
                     "far": far,
+                    "lot_area": lot_area,
+                    "bc_ratio": bc_ratio,
                     "floors_up": fl_up,
                     "floors_down": fl_down,
                     "approved_year": app_y_str,
