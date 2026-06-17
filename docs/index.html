@@ -805,8 +805,8 @@
     let cheongnaParcelsData = null;
     
     // Centers & Zooms
-    const pangyoCenter = [37.4005, 127.1090];
-    const cheongnaCenter = [37.5270, 126.6450];
+    const pangyoCenter = [37.4005, 127.1015];
+    const cheongnaCenter = [37.5385, 126.6490];
     const pangyoZoom = 15;
     const cheongnaZoom = 14;
 
@@ -1094,7 +1094,7 @@
     // Draw Target Bounding Box Rectangles
     function drawTargetRectangles() {
       // 1. Pangyo Target Rectangle
-      L.rectangle([[37.3950, 127.0980], [37.4060, 127.1200]], {
+      L.rectangle([[37.3950, 127.0880], [37.4060, 127.1150]], {
         color: '#ffffff',
         fillColor: '#38bdf8',
         fillOpacity: 0.02,
@@ -1103,7 +1103,7 @@
       }).addTo(maps.pangyo);
 
       // 2. Cheongna Target Rectangle
-      L.rectangle([[37.5150, 126.6300], [37.5390, 126.6600]], {
+      L.rectangle([[37.5280, 126.6350], [37.5490, 126.6630]], {
         color: '#ffffff',
         fillColor: '#f472b6',
         fillOpacity: 0.02,
@@ -1364,7 +1364,7 @@
       const pZones = comparisonData.land_use_zones.pangyo;
       const cZones = comparisonData.land_use_zones.cheongna;
       
-      const zoneLabels = Array.from(new Set([...Object.keys(pZones), ...Object.keys(cZones)]));
+      const zoneLabels = ["주거지역", "상업지역", "공업지역", "녹지지역"];
       const pZoneValues = zoneLabels.map(z => pZones[z] || 0);
       const cZoneValues = zoneLabels.map(z => cZones[z] || 0);
       
