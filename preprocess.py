@@ -168,7 +168,14 @@ def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sg
             })
     return sorted(results, key=lambda x: x['time_seconds'])
 
-def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgis_gdf):
+def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgis_gdf, bbox_gdf):
+    # Ensure CRS matching
+    assert_crs_5179(bbox_gdf, sgis_gdf)
+    
+    # Base SGIS points within the bounding box
+    bbox_poly = bbox_gdf.geometry.iloc[0]
+    base_sgis = sgis_gdf[sgis_gdf.geometry.within(bbox_poly)].copy()
+    
     max_seconds = max_minutes * 60
     station_points = []
     station_names = set()
@@ -188,7 +195,14 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
             station_names.add(stat_name)
             
     if not station_points:
-        return {"stations": 0, "population": 0, "workers": 0}
+        unique_joined = base_sgis.drop_duplicates(subset=['code'])
+        pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
+        work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
+        return {
+            "stations": 0,
+            "population": pop_sum,
+            "workers": work_sum
+        }
         
     buffers = [pt.buffer(1000) for pt in station_points]
     buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="EPSG:5179")
@@ -197,7 +211,8 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
     assert_crs_5179(buffers_gdf, sgis_gdf)
     
     joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="inner", predicate="intersects")
-    unique_joined = joined.drop_duplicates(subset=['code'])
+    combined_gdf = pd.concat([base_sgis, joined[sgis_gdf.columns]])
+    unique_joined = combined_gdf.drop_duplicates(subset=['code'])
     
     pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
     work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
@@ -208,7 +223,14 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
         "workers": work_sum
     }
 
-def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf):
+def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf, bbox_gdf):
+    # Ensure CRS matching
+    assert_crs_5179(bbox_gdf, sgis_gdf)
+    
+    # Base SGIS points within the bounding box
+    bbox_poly = bbox_gdf.geometry.iloc[0]
+    base_sgis = sgis_gdf[sgis_gdf.geometry.within(bbox_poly)].copy()
+    
     results = []
     for mins in range(0, 65, 5):
         max_seconds = mins * 60
@@ -230,22 +252,25 @@ def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf
                 station_names.add(stat_name)
                 
         if not station_points:
+            unique_joined = base_sgis.drop_duplicates(subset=['code'])
+            pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
+            work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
             results.append({
                 "time": mins,
                 "stations": 0,
-                "population": 0,
-                "workers": 0
+                "population": pop_sum,
+                "workers": work_sum
             })
             continue
             
         buffers = [pt.buffer(1000) for pt in station_points]
         buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="EPSG:5179")
         
-        # Assert CRS
         assert_crs_5179(buffers_gdf, sgis_gdf)
-        
         joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="inner", predicate="intersects")
-        unique_joined = joined.drop_duplicates(subset=['code'])
+        
+        combined_gdf = pd.concat([base_sgis, joined[sgis_gdf.columns]])
+        unique_joined = combined_gdf.drop_duplicates(subset=['code'])
         
         pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
         work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
@@ -256,6 +281,16 @@ def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf
             "population": pop_sum,
             "workers": work_sum
         })
+        
+    # Validation check: verify monotonicity
+    for idx in range(1, len(results)):
+        prev = results[idx-1]
+        curr = results[idx]
+        if curr['population'] < prev['population']:
+            raise ValueError(f"Monotonicity error: Population decreased from {prev['population']} at {prev['time']}m to {curr['population']} at {curr['time']}m.")
+        if curr['workers'] < prev['workers']:
+            raise ValueError(f"Monotonicity error: Workers decreased from {prev['workers']} at {prev['time']}m to {curr['workers']} at {curr['time']}m.")
+            
     return results
 
 def process_land_use_fast_local(file_path, target_dong_codes, target_pnus):
@@ -379,8 +414,8 @@ def main():
             weight = 0.0
         G.add_edge(u, v, weight=weight)
         
-    pangyo_nodes = nodes_df[nodes_df['statnm'].str.contains('판교')]['id'].tolist()
-    cheongna_nodes = nodes_df[nodes_df['statnm'].str.contains('청라국제도시')]['id'].tolist()
+    pangyo_nodes = nodes_df[nodes_df['statnm'] == '판교']['id'].tolist()
+    cheongna_nodes = nodes_df[nodes_df['statnm'] == '청라국제도시']['id'].tolist()
     
     pangyo_durations = nx.multi_source_dijkstra_path_length(G, pangyo_nodes, weight='weight')
     cheongna_durations = nx.multi_source_dijkstra_path_length(G, cheongna_nodes, weight='weight')
@@ -439,19 +474,23 @@ def main():
         c_dong_centroids_clipped.setdefault(c_prefix, []).append(cent)
         
     # Other dongs centroids (outside bbox) are built from UNCLIPPED parcels
-    p_centroids_all = p_box_5179.copy()
+    p_centroids_all = p_gdf.copy()
     p_centroids_all['centroid'] = p_centroids_all.geometry.centroid
     
-    c_centroids_all = c_box_5179.copy()
+    c_centroids_all = c_gdf.copy()
     c_centroids_all['centroid'] = c_centroids_all.geometry.centroid
     
     p_dong_centroids_all = {}
     for pnu, cent in zip(p_centroids_all['PNU'], p_centroids_all['centroid']):
+        if pd.isna(pnu):
+            continue
         p_prefix = str(pnu)[:10]
         p_dong_centroids_all.setdefault(p_prefix, []).append(cent)
         
     c_dong_centroids_all = {}
     for pnu, cent in zip(c_centroids_all['PNU'], c_centroids_all['centroid']):
+        if pd.isna(pnu):
+            continue
         c_prefix = str(pnu)[:10]
         c_dong_centroids_all.setdefault(c_prefix, []).append(cent)
         
@@ -563,10 +602,10 @@ def main():
     cheongna_30_stats = calculate_station_catchment(cheongna_durations, 30, nodes_df, c_sgis_gdf)
     cheongna_60_stats = calculate_station_catchment(cheongna_durations, 60, nodes_df, c_sgis_gdf)
     
-    pangyo_30_total = calculate_isochrone_totals(pangyo_durations, 30, nodes_df, p_sgis_gdf)
-    pangyo_60_total = calculate_isochrone_totals(pangyo_durations, 60, nodes_df, p_sgis_gdf)
-    cheongna_30_total = calculate_isochrone_totals(cheongna_durations, 30, nodes_df, c_sgis_gdf)
-    cheongna_60_total = calculate_isochrone_totals(cheongna_durations, 60, nodes_df, c_sgis_gdf)
+    pangyo_30_total = calculate_isochrone_totals(pangyo_durations, 30, nodes_df, p_sgis_gdf, p_bbox_gdf)
+    pangyo_60_total = calculate_isochrone_totals(pangyo_durations, 60, nodes_df, p_sgis_gdf, p_bbox_gdf)
+    cheongna_30_total = calculate_isochrone_totals(cheongna_durations, 30, nodes_df, c_sgis_gdf, c_bbox_gdf)
+    cheongna_60_total = calculate_isochrone_totals(cheongna_durations, 60, nodes_df, c_sgis_gdf, c_bbox_gdf)
     
     isochrone_data = {
         "pangyo_30": pangyo_30_stats,
@@ -592,8 +631,8 @@ def main():
     
     # Calculate cumulative accessibility data (for chart)
     print("[*] Calculating cumulative accessibility...")
-    pangyo_cum = calculate_cumulative_accessibility(pangyo_durations, nodes_df, p_sgis_gdf)
-    cheongna_cum = calculate_cumulative_accessibility(cheongna_durations, nodes_df, c_sgis_gdf)
+    pangyo_cum = calculate_cumulative_accessibility(pangyo_durations, nodes_df, p_sgis_gdf, p_bbox_gdf)
+    cheongna_cum = calculate_cumulative_accessibility(cheongna_durations, nodes_df, c_sgis_gdf, c_bbox_gdf)
     
     cumulative_data = {
         "pangyo": pangyo_cum,

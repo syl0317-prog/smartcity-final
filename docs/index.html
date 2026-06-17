@@ -1414,9 +1414,15 @@
       const pZones = comparisonData.land_use_zones.pangyo;
       const cZones = comparisonData.land_use_zones.cheongna;
       
-      const zoneLabels = ["주거지역", "상업지역", "공업지역", "녹지지역"];
-      const pZoneValues = zoneLabels.map(z => pZones[z] || 0);
-      const cZoneValues = zoneLabels.map(z => cZones[z] || 0);
+      const pOfficeCommercial = pZones["상업지역"] || 0;
+      const pOthers = (pZones["주거지역"] || 0) + (pZones["공업지역"] || 0) + (pZones["녹지지역"] || 0) + (pZones["개발제한구역"] || 0) + (pZones["기타/지구단위"] || 0);
+      
+      const cOfficeCommercial = cZones["상업지역"] || 0;
+      const cOthers = (cZones["주거지역"] || 0) + (cZones["공업지역"] || 0) + (cZones["녹지지역"] || 0) + (cZones["개발제한구역"] || 0) + (cZones["기타/지구단위"] || 0);
+      
+      const zoneLabels = ["업무/상업용지", "기타용지"];
+      const pZoneValues = [pOfficeCommercial, pOthers];
+      const cZoneValues = [cOfficeCommercial, cOthers];
       
       const ctxZone = document.getElementById('zone-chart').getContext('2d');
       zoneChart = new Chart(ctxZone, {
@@ -1572,6 +1578,7 @@
               {
                 label: '판교 (Pangyo)',
                 data: pY,
+                yAxisID: 'yPangyo',
                 borderColor: '#38bdf8',
                 backgroundColor: 'rgba(56, 189, 248, 0.05)',
                 borderWidth: 2.5,
@@ -1583,6 +1590,7 @@
               {
                 label: '청라 (Cheongna)',
                 data: cY,
+                yAxisID: 'yCheongna',
                 borderColor: '#f472b6',
                 backgroundColor: 'rgba(244, 114, 182, 0.05)',
                 borderWidth: 2.5,
@@ -1613,9 +1621,27 @@
                 ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
                 grid: { color: 'rgba(255, 255, 255, 0.03)' }
               },
-              y: {
-                ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              yPangyo: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                ticks: { 
+                  color: '#38bdf8', 
+                  font: { size: 9, family: 'Inter' },
+                  beginAtZero: true 
+                },
                 grid: { color: 'rgba(255, 255, 255, 0.05)' }
+              },
+              yCheongna: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                ticks: { 
+                  color: '#f472b6', 
+                  font: { size: 9, family: 'Inter' },
+                  beginAtZero: true 
+                },
+                grid: { drawOnChartArea: false }
               }
             }
           }
