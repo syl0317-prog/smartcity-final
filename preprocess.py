@@ -36,22 +36,25 @@ def process_land_use_fast(file_path, target_dong_codes, target_pnus):
         header = f.readline()
         cols = [c.strip('"') for c in header.split(',')]
         
-        # We need: '고유번호' (pnu), '법정동코드' (dong), '용도지역지구명' (zone)
+        # We need: '고유번호' (pnu), '법정동코드' (dong), '용도지역지구명' (zone), '용도지역지구코드' (code)
         idx_pnu = cols.index('고유번호') if '고유번호' in cols else 0
         idx_dong = cols.index('법정동코드') if '법정동코드' in cols else 1
         idx_zone = cols.index('용도지역지구명') if '용도지역지구명' in cols else 10
+        idx_code = cols.index('용도지역지구코드') if '용도지역지구코드' in cols else 9
         
         for line in f:
             row = line.split(',')
-            if len(row) > max(idx_pnu, idx_dong, idx_zone):
+            if len(row) > max(idx_pnu, idx_dong, idx_zone, idx_code):
                 dong = row[idx_dong].strip('"')
                 if dong in target_dong_codes:
                     zone = row[idx_zone].strip('"')
                     pnu = row[idx_pnu].strip('"')
+                    code = row[idx_code].strip('"')
                     if zone:
                         zone_counts[zone] = zone_counts.get(zone, 0) + 1
-                        if pnu in target_pnus:
-                            zoning_dict.setdefault(pnu, set()).add(zone)
+                        if code.startswith('UQA'):
+                            if pnu in target_pnus:
+                                zoning_dict.setdefault(pnu, set()).add(zone)
                             
     zoning_str_dict = {k: ", ".join(sorted(list(v))) for k, v in zoning_dict.items()}
     return zone_counts, zoning_str_dict
