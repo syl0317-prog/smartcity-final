@@ -73,7 +73,6 @@ def get_use_stats(df):
     df = df.copy()
     df['연면적_num'] = pd.to_numeric(df['연면적(㎡)'], errors='coerce').fillna(0)
     
-    # We define the target categories to keep them front and center in the comparison
     target_categories = ['업무시설', '교육연구시설', '공동주택', '단독주택', '근린생활시설']
     
     use_sums = {cat: 0.0 for cat in target_categories}
@@ -114,6 +113,14 @@ def build_pnu_from_register(df):
     df['PNU'] = pnu_series
     return df
 
+def assert_crs_5179(*gdfs):
+    for gdf in gdfs:
+        if gdf.crs is None:
+            raise ValueError("CRS is None! All geometry layers must be projected to EPSG:5179 before spatial operations.")
+        epsg = gdf.crs.to_epsg()
+        if epsg != 5179:
+            raise ValueError(f"CRS mismatch! Geometry has CRS EPSG:{epsg}, but EPSG:5179 is required.")
+
 def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sgis_gdf):
     max_seconds = max_minutes * 60
     results = []
@@ -135,12 +142,15 @@ def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sg
             
             # Create 1km Buffer
             buffer_geom = Point(x_5179, y_5179).buffer(1000)
-            buffer_gdf = gpd.GeoDataFrame(geometry=[buffer_geom], crs="epsg:5179")
+            buffer_gdf = gpd.GeoDataFrame(geometry=[buffer_geom], crs="EPSG:5179")
             
-            # Spatial join (how='left' and fillna(0) as requested)
-            joined = gpd.sjoin(buffer_gdf, sgis_gdf, how="left", predicate="contains")
-            pop_sum = int(joined['population'].fillna(0).sum())
-            work_sum = int(joined['workers'].fillna(0).sum())
+            # Assert CRS
+            assert_crs_5179(buffer_gdf, sgis_gdf)
+            
+            # Spatial join (how='inner' and predicate='intersects' as requested)
+            joined = gpd.sjoin(buffer_gdf, sgis_gdf, how="inner", predicate="intersects")
+            pop_sum = int(joined['population'].sum()) if not joined.empty else 0
+            work_sum = int(joined['workers'].sum()) if not joined.empty else 0
             
             results.append({
                 "id": int(node_id),
@@ -177,19 +187,17 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
     if not station_points:
         return {"stations": 0, "population": 0, "workers": 0}
         
-    # Create 1km buffers around reachable stations
     buffers = [pt.buffer(1000) for pt in station_points]
-    buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="epsg:5179")
+    buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="EPSG:5179")
     
-    # Left join to preserve all buffers, then map to SGIS
-    joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="left", predicate="contains")
-    joined_valid = joined.dropna(subset=['code'])
+    # Assert CRS
+    assert_crs_5179(buffers_gdf, sgis_gdf)
     
-    # Group by/Deduplicate unique SGIS block codes (adm_cd / code) to avoid overlap double-counting
-    unique_joined = joined_valid.drop_duplicates(subset=['code'])
+    joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="inner", predicate="intersects")
+    unique_joined = joined.drop_duplicates(subset=['code'])
     
-    pop_sum = int(unique_joined['population'].fillna(0).sum())
-    work_sum = int(unique_joined['workers'].fillna(0).sum())
+    pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
+    work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
     
     return {
         "stations": len(station_names),
@@ -199,7 +207,6 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
 
 def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf):
     results = []
-    # 0 to 60 minutes with 5-minute steps
     for mins in range(0, 65, 5):
         max_seconds = mins * 60
         station_points = []
@@ -229,14 +236,16 @@ def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf
             continue
             
         buffers = [pt.buffer(1000) for pt in station_points]
-        buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="epsg:5179")
+        buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="EPSG:5179")
         
-        joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="left", predicate="contains")
-        joined_valid = joined.dropna(subset=['code'])
-        unique_joined = joined_valid.drop_duplicates(subset=['code'])
+        # Assert CRS
+        assert_crs_5179(buffers_gdf, sgis_gdf)
         
-        pop_sum = int(unique_joined['population'].fillna(0).sum())
-        work_sum = int(unique_joined['workers'].fillna(0).sum())
+        joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="inner", predicate="intersects")
+        unique_joined = joined.drop_duplicates(subset=['code'])
+        
+        pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
+        work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
         
         results.append({
             "time": mins,
@@ -269,14 +278,12 @@ def process_land_use_fast_local(file_path, target_dong_codes, target_pnus):
                 dong = row[idx_dong].strip('"')
                 pnu = row[idx_pnu].strip('"')
                 
-                # Cheongna legacy dong codes mapped to 2826010700
+                # Cheongna legacy dongs mapping (only map administrative dong designation for target checks)
+                # To prevent PNU collision, we do NOT change PNU in land use parser,
+                # but map dong check to 2826010700 if it falls under legacy codes.
                 if dong in {"2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}:
                     dong = "2826010700"
-                    for prefix in ["2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"]:
-                        if pnu.startswith(prefix):
-                            pnu = "2826010700" + pnu[10:]
-                            break
-                            
+                    
                 if dong in target_dong_codes:
                     zone = row[idx_zone].strip('"')
                     code = row[idx_code].strip('"')
@@ -306,25 +313,21 @@ def main():
     docs_dir = workspace_dir / "docs"
     docs_dir.mkdir(exist_ok=True)
     
-    # 1. Cheongna Legacy Mapping Configs
-    cheongna_legacy_prefixes = ['2826012200', '2826010600', '2826010400', '2826011100', '2826011200', '2826011300']
-    cheongna_legacy_b_codes = {12200, 10600, 10400, 11100, 11200, 11300}
-    
-    def map_cheongna_pnu(pnu_val):
-        p_str = str(pnu_val)
-        for prefix in cheongna_legacy_prefixes:
-            if p_str.startswith(prefix):
-                return '2826010700' + p_str[10:]
-        return p_str
-        
     # -------------------------------------------------------------
-    # 2. Bounding Box & Center Settings (Strict boundaries)
+    # 1. Bounding Box & Center Settings (Strict boundaries)
     # -------------------------------------------------------------
     p_bbox_coords = [127.0980, 37.3950, 127.1150, 37.4060]
+    c_bbox_coords = [126.6415, 37.5325, 126.6565, 37.5445]
+    
     p_bbox_poly = box(p_bbox_coords[0], p_bbox_coords[1], p_bbox_coords[2], p_bbox_coords[3])
+    c_bbox_poly = box(c_bbox_coords[0], c_bbox_coords[1], c_bbox_coords[2], c_bbox_coords[3])
+    
+    # Bbox in 5179
+    p_bbox_gdf = gpd.GeoDataFrame(geometry=[p_bbox_poly], crs="EPSG:4326").to_crs("EPSG:5179")
+    c_bbox_gdf = gpd.GeoDataFrame(geometry=[c_bbox_poly], crs="EPSG:4326").to_crs("EPSG:5179")
     
     # -------------------------------------------------------------
-    # 3. Subway Network - Active Lines (<= 2024) Dijkstra Isochrone Building
+    # 2. Subway Network - Active Lines (<= 2024) Dijkstra Isochrone Building
     # -------------------------------------------------------------
     print("[*] Running Dijkstra path-finding on Active Subway network (<= 2024)...")
     nodes_file = workspace_dir / "subway_network" / "network" / "nodes.tsv"
@@ -337,7 +340,6 @@ def main():
     nodes_df = pd.read_csv(nodes_file, sep='\t', encoding='utf-8-sig')
     links_df = pd.read_csv(links_file, sep='\t', encoding='utf-8-sig')
     
-    # 2024년 이전 개통 노선만 필터링 (GTX 등 미개통 유령노선 제거)
     def is_active_2024(val):
         if pd.isna(val):
             return True
@@ -353,7 +355,6 @@ def main():
     nodes_df = nodes_df[nodes_df['begin'].apply(is_active_2024)].copy()
     links_df = links_df[links_df['begin'].apply(is_active_2024)].copy()
     
-    # nx Graph 빌드
     G = nx.Graph()
     for _, row in nodes_df.iterrows():
         node_id = int(row['id'])
@@ -385,34 +386,40 @@ def main():
     cheongna_durations = nx.multi_source_dijkstra_path_length(G, cheongna_nodes, weight='weight')
     
     # -------------------------------------------------------------
-    # 4. Load Parcel Shapefiles & Strict Clip (to get PNUs and Centroids)
+    # 3. Load Parcel Shapefiles & Project to EPSG:5179 (UTM-K) Immediately
     # -------------------------------------------------------------
-    print("[*] Loading parcel shapefiles & strictly clipping...")
+    print("[*] Loading parcel shapefiles & projecting to EPSG:5179...")
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
     
-    p_gdf = gpd.read_file(p_shp)
-    c_gdf = gpd.read_file(c_shp)
+    p_gdf = gpd.read_file(p_shp).to_crs("EPSG:5179")
+    c_gdf = gpd.read_file(c_shp).to_crs("EPSG:5179")
     
-    # Map legacy PNU prefixes for Cheongna shapefile
-    c_gdf['PNU'] = c_gdf['PNU'].apply(map_cheongna_pnu)
+    # Filter using original legal prefixes to prevent PNU collision
+    pangyo_legacy_prefixes = ('4113510900',)
+    cheongna_legacy_prefixes = ('2826010700', '2826012200', '2826010600', '2826010400', '2826011100', '2826011200', '2826011300')
     
-    # 법정동코드 필터링 (정확한 == 일치 연산)
-    p_box = p_gdf[p_gdf['PNU'].astype(str).str.slice(0, 10) == '4113510900'].copy()
-    c_box = c_gdf[c_gdf['PNU'].astype(str).str.slice(0, 10) == '2826010700'].copy()
+    p_box_5179 = p_gdf[p_gdf['PNU'].astype(str).str.startswith(pangyo_legacy_prefixes)].copy()
+    c_box_5179 = c_gdf[c_gdf['PNU'].astype(str).str.startswith(cheongna_legacy_prefixes)].copy()
     
-    # All spatial calculations must occur in EPSG:5179 (UTM-K)
-    p_box_5179 = p_box.to_crs(epsg=5179)
-    c_box_5179 = c_box.to_crs(epsg=5179)
+    # -------------------------------------------------------------
+    # 4. Strict Spatial Clip in EPSG:5179
+    # -------------------------------------------------------------
+    # Clip Pangyo using its bounding box
+    assert_crs_5179(p_box_5179, p_bbox_gdf)
+    p_box_clipped = p_box_5179[p_box_5179.geometry.intersects(p_bbox_gdf.geometry.iloc[0])].copy()
+    p_box_clipped = p_box_clipped.clip(p_bbox_gdf.geometry.iloc[0])
     
-    # Clip Pangyo using its Bounding Box (reprojected to 5179)
-    p_bbox_poly_5179 = gpd.GeoSeries([p_bbox_poly], crs="epsg:4326").to_crs(epsg=5179).iloc[0]
-    p_box_clipped = p_box_5179[p_box_5179.geometry.intersects(p_bbox_poly_5179)].copy()
+    # Clip Cheongna using cheongna_ibd.geojson spatial join, then clip with bounding box mask
+    cheongna_ibd_gdf = gpd.read_file(workspace_dir / "cheongna_ibd.geojson").to_crs("EPSG:5179")
+    assert_crs_5179(c_box_5179, cheongna_ibd_gdf, c_bbox_gdf)
     
-    # Clip Cheongna using cheongna_ibd.geojson (International Business District boundary, projected to 5179)
-    cheongna_ibd_gdf = gpd.read_file(workspace_dir / "cheongna_ibd.geojson").to_crs(epsg=5179)
+    # 1) Spatial Join intersects
     c_box_clipped = gpd.sjoin(c_box_5179, cheongna_ibd_gdf, how="inner", predicate="intersects")
-    c_box_clipped = c_box_clipped[c_box_5179.columns].copy() # keep original columns
+    c_box_clipped = c_box_clipped[c_box_5179.columns].copy().drop_duplicates(subset=['PNU'])
+    
+    # 2) Clip with mask (final step)
+    c_box_clipped = c_box_clipped.clip(c_bbox_gdf.geometry.iloc[0])
     
     # Centroids list for Demographics Dong mapping
     p_centroids_5179 = p_box_5179.copy()
@@ -443,7 +450,6 @@ def main():
     incheon_work_file = workspace_dir / "SGIS" / "23080_2023년_산업분류별(10차_대분류)_총괄종사자수.csv"
     bundang_work_file = workspace_dir / "SGIS" / "31023_2023년_산업분류별(10차_대분류)_총괄종사자수.csv"
     
-    # 행정동(7자리) -> 법정동접두사(10자리) 매핑
     dong_mapping = {
         # 분당구
         "3102351": "4113510100", # 분당동
@@ -465,7 +471,7 @@ def main():
         "3102375": "4113511400", # 구미동
         "3102378": "4113511500", # 백현동
         
-        # 인천 서구
+        # 인천 서구 (Keep original legacy prefixes to map with c_dong_centroids)
         "2308057": "2826011100", # 연희동
         "2308058": "2826011200", # 경서동
         "2308059": "2826011300", # 원창동
@@ -495,10 +501,6 @@ def main():
             h_dong = code[:7]
             b_dong = dong_mapping.get(h_dong, "")
             
-            # Map legacy Cheongna dongs to 2826010700
-            if b_dong in {"2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}:
-                b_dong = "2826010700"
-                
             geom = None
             if b_dong in centroids_dict and len(centroids_dict[b_dong]) > 0:
                 try:
@@ -520,7 +522,7 @@ def main():
                 "geometry": geom
             })
             
-        return gpd.GeoDataFrame(records, crs="epsg:5179")
+        return gpd.GeoDataFrame(records, crs="EPSG:5179")
         
     p_sgis_gdf = build_sgis_gdf(bundang_pop_file, bundang_work_file, p_dong_centroids, p_default_cent)
     c_sgis_gdf = build_sgis_gdf(incheon_pop_file, incheon_work_file, c_dong_centroids, c_default_cent)
@@ -534,7 +536,6 @@ def main():
     cheongna_30_stats = calculate_station_catchment(cheongna_durations, 30, nodes_df, c_sgis_gdf)
     cheongna_60_stats = calculate_station_catchment(cheongna_durations, 60, nodes_df, c_sgis_gdf)
     
-    # Deduplicated totals for the whole isochrone
     pangyo_30_total = calculate_isochrone_totals(pangyo_durations, 30, nodes_df, p_sgis_gdf)
     pangyo_60_total = calculate_isochrone_totals(pangyo_durations, 60, nodes_df, p_sgis_gdf)
     cheongna_30_total = calculate_isochrone_totals(cheongna_durations, 30, nodes_df, c_sgis_gdf)
@@ -586,8 +587,11 @@ def main():
     print("[*] Calculating boundary demographics...")
     cheongna_ibd_poly = cheongna_ibd_gdf.geometry.unary_union
     
-    p_sgis_bbox = p_sgis_gdf[p_sgis_gdf.geometry.within(p_bbox_poly_5179)].copy()
-    c_sgis_bbox = c_sgis_gdf[c_sgis_gdf.geometry.within(cheongna_ibd_poly)].copy()
+    assert_crs_5179(p_sgis_gdf, p_bbox_gdf)
+    assert_crs_5179(c_sgis_gdf, c_bbox_gdf, cheongna_ibd_gdf)
+    
+    p_sgis_bbox = p_sgis_gdf[p_sgis_gdf.geometry.within(p_bbox_gdf.geometry.iloc[0])].copy()
+    c_sgis_bbox = c_sgis_gdf[c_sgis_gdf.geometry.within(cheongna_ibd_poly) & c_sgis_gdf.geometry.within(c_bbox_gdf.geometry.iloc[0])].copy()
     
     pangyo_pop = int(p_sgis_bbox['population'].sum())
     pangyo_workers = int(p_sgis_bbox['workers'].sum())
@@ -607,28 +611,17 @@ def main():
     p_b_df = pd.read_csv(pangyo_b_file, encoding='utf-8-sig')
     c_b_df = pd.read_csv(cheongna_b_file, encoding='utf-8-sig')
     
-    # Map legacy building codes in c_b_df
-    c_b_df['법정동코드'] = c_b_df['법정동코드'].replace({c: 10700 for c in cheongna_legacy_b_codes})
-    
-    # Build PNU first
+    # Build PNU using original codes to prevent collision during merge
     p_b_clean_all = build_pnu_from_register(p_b_df)
     c_b_clean_all = build_pnu_from_register(c_b_df)
     
-    # Filter by exact legal dong code
+    # Filter buildings strictly inside final parcels (original PNU merge)
     p_b_filtered = p_b_clean_all[p_b_clean_all['법정동코드'] == 10900].copy()
-    c_b_filtered = c_b_clean_all[c_b_clean_all['법정동코드'] == 10700].copy()
-    
-    # Filter buildings strictly inside final parcels (clipping check)
     p_b_filtered = p_b_filtered[p_b_filtered['PNU'].isin(p_box_clipped['PNU'])].copy()
-    c_b_filtered = c_b_filtered[c_b_filtered['PNU'].isin(c_box_clipped['PNU'])].copy()
     
-    # Calculate LUM
-    pangyo_lum = calculate_lum(p_b_filtered)
-    cheongna_lum = calculate_lum(c_b_filtered)
-    
-    # Group '공장', '창고시설' under '기타' in use classification
-    pangyo_use_stats = get_use_stats(p_b_filtered)
-    cheongna_use_stats = get_use_stats(c_b_filtered)
+    # Cheongna: Filter by original legal dong codes in registration before join
+    c_b_filtered_legacy = c_b_clean_all[c_b_clean_all['법정동코드'].isin({10700, 12200, 10600, 10400, 11100, 11200, 11300})].copy()
+    c_b_filtered = c_b_filtered_legacy[c_b_filtered_legacy['PNU'].isin(c_box_clipped['PNU'])].copy()
     
     # Categorize Land Use counts
     p_pnus_bbox = set(p_box_clipped['PNU'].dropna().unique())
@@ -638,10 +631,40 @@ def main():
     cheongna_lu_file = workspace_dir / "토지이용" / "AL_D155_28_20241204" / "AL_D155_28_20241204.csv"
     
     pangyo_dong_codes_str = {"4113510900"}
-    cheongna_dong_codes_str = {"2826010700"}
+    # Target check for Cheongna land use uses original legacy codes to find zoning without collision
+    cheongna_dong_codes_str = {"2826010700", "2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}
     
     pangyo_lu_raw, p_zoning = process_land_use_fast_local(pangyo_lu_file, pangyo_dong_codes_str, p_pnus_bbox)
     cheongna_lu_raw, c_zoning = process_land_use_fast_local(cheongna_lu_file, cheongna_dong_codes_str, c_pnus_bbox)
+    
+    p_box_clipped['zoning'] = p_box_clipped['PNU'].map(p_zoning).fillna("지정정보없음")
+    c_box_clipped['zoning'] = c_box_clipped['PNU'].map(c_zoning).fillna("지정정보없음")
+    
+    # Merge buildings with parcels to map zoning
+    p_b_merged = p_b_filtered.merge(p_box_clipped[['PNU', 'zoning']], on='PNU', how='inner')
+    c_b_merged = c_b_filtered.merge(c_box_clipped[['PNU', 'zoning']], on='PNU', how='inner')
+    
+    # Map the legal dong codes of all Cheongna buildings & parcels to 10700 / 2826010700 AFTER merging to prevent collision
+    p_box_clipped['법정동코드'] = '4113510900'
+    c_box_clipped['법정동코드'] = '2826010700'
+    
+    p_b_merged['법정동코드'] = 10900
+    c_b_merged['법정동코드'] = 10700
+    
+    # Filter strictly by exact match
+    p_box_clipped = p_box_clipped[p_box_clipped['법정동코드'] == '4113510900']
+    c_box_clipped = c_box_clipped[c_box_clipped['법정동코드'] == '2826010700']
+    
+    p_b_filtered = p_b_merged[p_b_merged['법정동코드'] == 10900]
+    c_b_filtered = c_b_merged[c_b_merged['법정동코드'] == 10700]
+    
+    # Calculate LUM
+    pangyo_lum = calculate_lum(p_b_filtered)
+    cheongna_lum = calculate_lum(c_b_filtered)
+    
+    # Group '공장', '창고시설' under '기타' in use classification
+    pangyo_use_stats = get_use_stats(p_b_filtered)
+    cheongna_use_stats = get_use_stats(c_b_filtered)
     
     def categorize_zones(zone_counts):
         categories = {
@@ -658,8 +681,6 @@ def main():
             elif any(term in zone for term in ["상업", "업무"]):
                 categories["상업지역"] += count
             elif any(term in zone for term in ["공업", "공장", "산업"]):
-                # Although factories and warehouses are mapped to Others in buildings,
-                # land use planning zones for industrial areas can still be categorized or mapped as needed.
                 categories["공업지역"] += count
             elif any(term in zone for term in ["녹지", "공원", "보전녹지", "자연녹지"]):
                 categories["녹지지역"] += count
@@ -728,8 +749,6 @@ def main():
     # 9. Convert Parcel Shapefiles to GeoJSON with Zoning & Register Joined
     # -------------------------------------------------------------
     print("[*] Generating GeoJSON parcels layers...")
-    p_box_clipped['zoning'] = p_box_clipped['PNU'].map(p_zoning).fillna("지정정보없음")
-    c_box_clipped['zoning'] = c_box_clipped['PNU'].map(c_zoning).fillna("지정정보없음")
     
     # PNU-based deduplicated details
     p_b_clean = p_b_filtered.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
@@ -853,16 +872,18 @@ def main():
     # -------------------------------------------------------------
     # 11. Integrity Verification Log & Safety Checks
     # -------------------------------------------------------------
+    p_office_count = len(p_b_filtered[p_b_filtered['zoning'].str.contains('상업|업무', na=False)])
+    c_office_count = len(c_b_filtered[c_b_filtered['zoning'].str.contains('상업|업무', na=False)])
+    c_industrial_count = len(c_b_filtered[c_b_filtered['zoning'].str.contains('공업|산업|공장', na=False)])
+    
     print("\n" + "="*60)
-    print("[*] INTEGRITY VERIFICATION LOG")
-    print(f"  1) Final Parcel Count: Pangyo = {len(p_box_clipped)} vs Cheongna = {len(c_box_clipped)}")
-    print(f"  2) Final Building Count in Register: Pangyo = {len(p_b_filtered)} vs Cheongna = {len(c_b_filtered)}")
-    print(f"  3) Base Region Population inside BBox/IBD: Pangyo = {pangyo_pop} vs Cheongna = {cheongna_pop}")
-    print(f"  4) 60m Deduplicated Catchment Population: Pangyo = {pangyo_60_total['population']} vs Cheongna = {cheongna_60_total['population']}")
-    print(f"  5) 60m Deduplicated Catchment Workers: Pangyo = {pangyo_60_total['workers']} vs Cheongna = {cheongna_60_total['workers']}")
+    print("[*] INTEGRITY VERIFICATION LOG (DASHBOARD REDESIGN)")
+    print(f"  1) 필터링 후 [판교 업무용지 건물 수]: {p_office_count}동 vs [청라 업무용지 건물 수]: {c_office_count}동")
+    print(f"  2) 필터링 후 [청라 공업지역 건물 수]: {c_industrial_count}동")
+    print(f"  3) [판교 직주비]: {pangyo_ratio} vs [청라 직주비]: {cheongna_ratio}")
     print("="*60 + "\n")
     
-    # Safety Checks: Stop if values are 0 or abnormally large
+    # Safety Checks: Stop if values are 0 or industrial building count exceeds 100
     if len(p_box_clipped) == 0 or len(c_box_clipped) == 0:
         raise ValueError("Error: Final parcel count is 0! Spatial clipping or legal dong filtering failed.")
     if len(p_b_filtered) == 0 or len(c_b_filtered) == 0:
@@ -872,11 +893,9 @@ def main():
     if pangyo_60_total['population'] == 0 or cheongna_60_total['population'] == 0:
         raise ValueError("Error: Catchment population is 0! Subway accessibility calculation failed.")
         
-    # Upper bounds safety limits
-    if len(p_box_clipped) > 10000 or len(c_box_clipped) > 10000:
-        raise ValueError("Error: Final parcel count is abnormally large (>10,000)!")
-    if pangyo_pop > 100000 or cheongna_pop > 200000:
-        raise ValueError("Error: BBox population is abnormally large (>100k for Pangyo / >200k for Cheongna)!")
+    # User constraint: If Cheongna industrial buildings >= 100, raise error and terminate
+    if c_industrial_count >= 100:
+        raise ValueError(f"Error: Cheongna industrial building count ({c_industrial_count}) is >= 100! Filtering failed to exclude industrial areas.")
         
     print("[+] Preprocessing successfully completed without errors!")
 

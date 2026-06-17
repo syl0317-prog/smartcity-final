@@ -6040,8 +6040,8 @@
       "lat": 37.55648532952862,
       "time_seconds": 0,
       "time_minutes": 0.0,
-      "population": 0,
-      "workers": 0
+      "population": 4957,
+      "workers": 804
     },
     {
       "id": 314,
@@ -6150,8 +6150,8 @@
       "lat": 37.593046182371125,
       "time_seconds": 1088.0,
       "time_minutes": 18.13,
-      "population": 289,
-      "workers": 18
+      "population": 2004,
+      "workers": 133
     },
     {
       "id": 289,
@@ -6161,8 +6161,8 @@
       "lat": 37.55202843644741,
       "time_seconds": 1095.0,
       "time_minutes": 18.25,
-      "population": 10921,
-      "workers": 4463
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 277,
@@ -6183,8 +6183,8 @@
       "lat": 37.54398102426325,
       "time_seconds": 1192.0,
       "time_minutes": 19.87,
-      "population": 21384,
-      "workers": 7794
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 284,
@@ -6194,8 +6194,8 @@
       "lat": 37.59765913177729,
       "time_seconds": 1194.0,
       "time_minutes": 19.9,
-      "population": 1826,
-      "workers": 1720
+      "population": 2549,
+      "workers": 731
     },
     {
       "id": 309,
@@ -6227,8 +6227,8 @@
       "lat": 37.60168928630328,
       "time_seconds": 1327.0,
       "time_minutes": 22.12,
-      "population": 3349,
-      "workers": 2307
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 291,
@@ -6491,8 +6491,8 @@
       "lat": 37.5003237331973,
       "time_seconds": 1699.0,
       "time_minutes": 28.32,
-      "population": 10628,
-      "workers": 5151
+      "population": 558,
+      "workers": 155
     },
     {
       "id": 574,
@@ -6537,8 +6537,8 @@
       "lat": 37.55648532952862,
       "time_seconds": 0,
       "time_minutes": 0.0,
-      "population": 0,
-      "workers": 0
+      "population": 4957,
+      "workers": 804
     },
     {
       "id": 314,
@@ -6647,8 +6647,8 @@
       "lat": 37.593046182371125,
       "time_seconds": 1088.0,
       "time_minutes": 18.13,
-      "population": 289,
-      "workers": 18
+      "population": 2004,
+      "workers": 133
     },
     {
       "id": 289,
@@ -6658,8 +6658,8 @@
       "lat": 37.55202843644741,
       "time_seconds": 1095.0,
       "time_minutes": 18.25,
-      "population": 10921,
-      "workers": 4463
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 277,
@@ -6680,8 +6680,8 @@
       "lat": 37.54398102426325,
       "time_seconds": 1192.0,
       "time_minutes": 19.87,
-      "population": 21384,
-      "workers": 7794
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 284,
@@ -6691,8 +6691,8 @@
       "lat": 37.59765913177729,
       "time_seconds": 1194.0,
       "time_minutes": 19.9,
-      "population": 1826,
-      "workers": 1720
+      "population": 2549,
+      "workers": 731
     },
     {
       "id": 309,
@@ -6724,8 +6724,8 @@
       "lat": 37.60168928630328,
       "time_seconds": 1327.0,
       "time_minutes": 22.12,
-      "population": 3349,
-      "workers": 2307
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 291,
@@ -6988,8 +6988,8 @@
       "lat": 37.5003237331973,
       "time_seconds": 1699.0,
       "time_minutes": 28.32,
-      "population": 10628,
-      "workers": 5151
+      "population": 558,
+      "workers": 155
     },
     {
       "id": 574,
@@ -7032,8 +7032,8 @@
       "lat": 37.48982331843308,
       "time_seconds": 1818.0,
       "time_minutes": 30.3,
-      "population": 12165,
-      "workers": 7408
+      "population": 558,
+      "workers": 155
     },
     {
       "id": 575,
@@ -7131,8 +7131,8 @@
       "lat": 37.48408136361174,
       "time_seconds": 1967.0,
       "time_minutes": 32.78,
-      "population": 330,
-      "workers": 106
+      "population": 9018,
+      "workers": 5021
     },
     {
       "id": 270,
@@ -7153,8 +7153,8 @@
       "lat": 37.50622938576725,
       "time_seconds": 2032.0,
       "time_minutes": 33.87,
-      "population": 2396,
-      "workers": 1035
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 577,
@@ -7197,8 +7197,8 @@
       "lat": 37.474120642777365,
       "time_seconds": 2106.0,
       "time_minutes": 35.1,
-      "population": 573,
-      "workers": 108
+      "population": 287,
+      "workers": 20
     },
     {
       "id": 873,
@@ -8209,8 +8209,8 @@
       "lat": 37.48299691688588,
       "time_seconds": 2855.0,
       "time_minutes": 47.58,
-      "population": 228,
-      "workers": 49
+      "population": 0,
+      "workers": 0
     },
     {
       "id": 641,
@@ -9788,13 +9788,13 @@
     },
     "cheongna_30": {
       "stations": 35,
-      "population": 35650,
-      "workers": 15270
+      "population": 8470,
+      "workers": 1720
     },
     "cheongna_60": {
       "stations": 228,
-      "population": 37805,
-      "workers": 17670
+      "population": 17488,
+      "workers": 6741
     }
   }
 }

@@ -1,0 +1,162 @@
+{
+  "pangyo": [
+    {
+      "time": 0,
+      "stations": 1,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 5,
+      "stations": 4,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 10,
+      "stations": 9,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 15,
+      "stations": 18,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 20,
+      "stations": 28,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 25,
+      "stations": 43,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 30,
+      "stations": 72,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 35,
+      "stations": 100,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 40,
+      "stations": 131,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 45,
+      "stations": 187,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 50,
+      "stations": 251,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 55,
+      "stations": 298,
+      "population": 5271,
+      "workers": 35025
+    },
+    {
+      "time": 60,
+      "stations": 343,
+      "population": 5271,
+      "workers": 35025
+    }
+  ],
+  "cheongna": [
+    {
+      "time": 0,
+      "stations": 1,
+      "population": 4957,
+      "workers": 804
+    },
+    {
+      "time": 5,
+      "stations": 2,
+      "population": 4957,
+      "workers": 804
+    },
+    {
+      "time": 10,
+      "stations": 3,
+      "population": 4957,
+      "workers": 804
+    },
+    {
+      "time": 15,
+      "stations": 5,
+      "population": 4957,
+      "workers": 804
+    },
+    {
+      "time": 20,
+      "stations": 14,
+      "population": 7912,
+      "workers": 1565
+    },
+    {
+      "time": 25,
+      "stations": 21,
+      "population": 7912,
+      "workers": 1565
+    },
+    {
+      "time": 30,
+      "stations": 35,
+      "population": 8470,
+      "workers": 1720
+    },
+    {
+      "time": 35,
+      "stations": 48,
+      "population": 17488,
+      "workers": 6741
+    },
+    {
+      "time": 40,
+      "stations": 70,
+      "population": 17488,
+      "workers": 6741
+    },
+    {
+      "time": 45,
+      "stations": 95,
+      "population": 17488,
+      "workers": 6741
+    },
+    {
+      "time": 50,
+      "stations": 147,
+      "population": 17488,
+      "workers": 6741
+    },
+    {
+      "time": 55,
+      "stations": 183,
+      "population": 17488,
+      "workers": 6741
+    },
+    {
+      "time": 60,
+      "stations": 228,
+      "population": 17488,
+      "workers": 6741
+    }
+  ]
+}
