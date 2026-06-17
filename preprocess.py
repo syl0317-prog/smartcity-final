@@ -198,16 +198,20 @@ def main():
     # 6. Parcel Data Processing (SHP -> GeoJSON with Zoning & Register Joined)
     # -------------------------------------------------------------
     print("[*] Processing parcel data...")
+    p_box_coords = [127.0980, 37.3950, 127.1200, 37.4060]
+    c_box_coords = [126.6350, 37.5330, 126.6630, 37.5490]
     
-    # Pangyo Parcels (Filter by Dong Code 4113510900 - 삼평동)
+    # Pangyo Parcels (Filter by Dong Code 4113510900 - 삼평동 & cx)
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
     p_gdf = gpd.read_file(p_shp).to_crs(epsg=4326)
     p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith('4113510900')].copy()
+    p_box = p_box.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
     
-    # Cheongna Parcels (Filter by Dong Code 2826012200 - 청라동)
+    # Cheongna Parcels (Filter by Dong Code 2826012200 - 청라동 & cx)
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
     c_gdf = gpd.read_file(c_shp).to_crs(epsg=4326)
     c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith('2826012200')].copy()
+    c_box = c_box.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
     
     p_pnus = set(p_box['PNU'].dropna().unique())
     c_pnus = set(c_box['PNU'].dropna().unique())
@@ -371,23 +375,28 @@ def main():
     
     p_build_gdf = gpd.read_file(p_build_shp).to_crs(epsg=4326)
     c_build_gdf = gpd.read_file(c_build_shp).to_crs(epsg=4326)
+    # Filter directly by Bounding Box coords
+    print("    Filtering OSM buildings by official bbox...")
+    p_build_box = p_build_gdf.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
+    c_build_box = c_build_gdf.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
     
-    # Spatial join with parcels to filter by target Dong area and get PNU
-    print("    Joining OSM buildings with target dong parcels...")
-    p_build_centroids = p_build_gdf.copy()
-    p_build_centroids['geometry'] = p_build_gdf.centroid
-    p_joined = gpd.sjoin(p_build_centroids, p_box[['PNU', 'geometry']], how='inner', predicate='within')
-    p_build_box = p_build_gdf.loc[p_joined.index].copy()
+    # Spatial join with parcels (how='left' to keep 100% of buildings in bbox)
+    print("    Joining filtered buildings with parcel PNUs...")
+    p_build_centroids = p_build_box.copy()
+    p_build_centroids['geometry'] = p_build_box.centroid
+    p_joined = gpd.sjoin(p_build_centroids, p_box[['PNU', 'geometry']], how='left', predicate='within')
+    # Resolve duplicated indices from sjoin if any
+    p_joined = p_joined[~p_joined.index.duplicated(keep='first')]
     p_build_box['PNU'] = p_joined['PNU']
     
-    c_build_centroids = c_build_gdf.copy()
-    c_build_centroids['geometry'] = c_build_gdf.centroid
-    c_joined = gpd.sjoin(c_build_centroids, c_box[['PNU', 'geometry']], how='inner', predicate='within')
-    c_build_box = c_build_gdf.loc[c_joined.index].copy()
+    c_build_centroids = c_build_box.copy()
+    c_build_centroids['geometry'] = c_build_box.centroid
+    c_joined = gpd.sjoin(c_build_centroids, c_box[['PNU', 'geometry']], how='left', predicate='within')
+    c_joined = c_joined[~c_joined.index.duplicated(keep='first')]
     c_build_box['PNU'] = c_joined['PNU']
     
-    print(f"    Pangyo (Sampyeong-dong) buildings found: {len(p_build_box)}")
-    print(f"    Cheongna (Cheongna-dong) buildings found: {len(c_build_box)}")
+    print(f"    Pangyo (Sampyeong-dong bbox) buildings found: {len(p_build_box)}")
+    print(f"    Cheongna (Cheongna-dong bbox) buildings found: {len(c_build_box)}")
     
     p_merged = p_build_box.merge(
         p_b_clean[[
