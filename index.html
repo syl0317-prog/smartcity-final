@@ -800,13 +800,6 @@
         </div>
       </div>
 
-      <!-- Chart Card 2: Land Use Zone Grouped Bar -->
-      <div class="chart-card">
-        <h3>🌱 용도지역지구 지정 분포 비교 (3-1)</h3>
-        <div class="chart-wrapper">
-          <canvas id="zone-chart"></canvas>
-        </div>
-      </div>
 
       <!-- Chart Card 2.5: Industry Composition Grouped Bar -->
       <div class="chart-card">
@@ -819,12 +812,7 @@
       <!-- Chart Card 3: Cumulative Accessibility Line -->
       <div class="chart-card">
         <div class="chart-header">
-          <h3>📈 누적 대중교통 접근성 곡선 (3-3)</h3>
-          <select id="accessibility-metric" class="chart-select">
-            <option value="population">도달가능 인구수</option>
-            <option value="workers">도달가능 종사자수</option>
-            <option value="stations">도달가능 지하철역수</option>
-          </select>
+          <h3>📈 누적 대중교통 접근성 곡선 (3-3): 도달가능 지하철역수</h3>
         </div>
         <div class="chart-wrapper">
           <canvas id="accessibility-chart"></canvas>
@@ -1410,71 +1398,7 @@
         }
       });
 
-      // 2. Grouped Bar Chart: Land Use Zones Comparison
-      const pZones = comparisonData.land_use_zones.pangyo;
-      const cZones = comparisonData.land_use_zones.cheongna;
-      
-      const pOfficeCommercial = pZones["상업지역"] || 0;
-      const pOthers = (pZones["주거지역"] || 0) + (pZones["공업지역"] || 0) + (pZones["녹지지역"] || 0) + (pZones["개발제한구역"] || 0) + (pZones["기타/지구단위"] || 0);
-      
-      const cOfficeCommercial = cZones["상업지역"] || 0;
-      const cOthers = (cZones["주거지역"] || 0) + (cZones["공업지역"] || 0) + (cZones["녹지지역"] || 0) + (cZones["개발제한구역"] || 0) + (cZones["기타/지구단위"] || 0);
-      
-      const zoneLabels = ["업무/상업용지", "기타용지"];
-      const pZoneValues = [pOfficeCommercial, pOthers];
-      const cZoneValues = [cOfficeCommercial, cOthers];
-      
-      const ctxZone = document.getElementById('zone-chart').getContext('2d');
-      zoneChart = new Chart(ctxZone, {
-        type: 'bar',
-        data: {
-          labels: zoneLabels,
-          datasets: [
-            {
-              label: '판교 (Pangyo)',
-              data: pZoneValues,
-              backgroundColor: '#38bdf8',
-              borderColor: '#0284c7',
-              borderWidth: 1,
-              borderRadius: 4
-            },
-            {
-              label: '청라 (Cheongna)',
-              data: cZoneValues,
-              backgroundColor: '#f472b6',
-              borderColor: '#db2777',
-              borderWidth: 1,
-              borderRadius: 4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return context.dataset.label + ': ' + context.raw.toLocaleString() + '건';
-                }
-              }
-            }
-          },
-          scales: {
-            x: {
-              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
-              grid: { display: false }
-            },
-            y: {
-              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
-              grid: { color: 'rgba(255, 255, 255, 0.05)' }
-            }
-          }
-        }
-      });
+
 
       // 2.5. Grouped Bar Chart: Industry Composition Comparison
       const pInd = comparisonData.industry_ratio.pangyo;
@@ -1544,20 +1468,15 @@
       updateAccessibilityChart();
     }
 
-    // Update line chart with select metric (population, workers, stations)
+    // Update line chart with station count metric
     function updateAccessibilityChart() {
-      const metric = document.getElementById('accessibility-metric').value;
+      const metric = 'stations';
       const xLabels = accessibilityData.pangyo.map(d => d.time + '분');
       
       const pY = accessibilityData.pangyo.map(d => d[metric]);
       const cY = accessibilityData.cheongna.map(d => d[metric]);
       
-      let unit = '';
-      if (metric === 'population' || metric === 'workers') {
-        unit = '명';
-      } else {
-        unit = '개 역';
-      }
+      let unit = '개 역';
       
       const ctxAccess = document.getElementById('accessibility-chart').getContext('2d');
       
@@ -1772,10 +1691,7 @@
       });
     });
 
-    // Select metric change event listener
-    document.getElementById('accessibility-metric').addEventListener('change', () => {
-      updateAccessibilityChart();
-    });
+
 
     // Run setup on load
     window.addEventListener('DOMContentLoaded', loadData);
