@@ -54,9 +54,19 @@ def process_land_use_fast(file_path, target_dong_codes, target_pnus):
                         zone_counts[zone] = zone_counts.get(zone, 0) + 1
                         if code.startswith('UQA'):
                             if pnu in target_pnus:
-                                zoning_dict.setdefault(pnu, set()).add(zone)
+                                zoning_dict.setdefault(pnu, set()).add((code, zone))
                             
-    zoning_str_dict = {k: ", ".join(sorted(list(v))) for k, v in zoning_dict.items()}
+    def get_priority_key(item):
+        c, n = item
+        is_detailed = 1 if c not in ['UQA001', 'UQA002', 'UQA003', 'UQA004', 'UQA000'] else 0
+        name_len = len(n) if n else 0
+        return (is_detailed, name_len, c)
+
+    zoning_str_dict = {}
+    for k, v in zoning_dict.items():
+        sorted_items = sorted(list(v), key=get_priority_key, reverse=True)
+        zoning_str_dict[k] = ", ".join([item[1] for item in sorted_items])
+        
     return zone_counts, zoning_str_dict
 
 def main():
