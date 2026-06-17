@@ -1,15 +1,15 @@
 {
   "demographics": {
     "pangyo": {
-      "population": 6458,
-      "workers": 42108,
-      "ratio": 6.52,
+      "population": 11716,
+      "workers": 96004,
+      "ratio": 8.194,
       "lum": 0.69
     },
     "cheongna": {
-      "population": 5369,
-      "workers": 4260,
-      "ratio": 0.793,
+      "population": 36830,
+      "workers": 43310,
+      "ratio": 1.176,
       "lum": 0.603
     }
   },
