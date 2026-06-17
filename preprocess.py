@@ -5,6 +5,19 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
+def clean_nan(obj):
+    import math
+    if isinstance(obj, dict):
+        return {k: clean_nan(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan(v) for v in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+    elif pd.isna(obj):
+        return None
+    return obj
+
 def main():
     print("[*] Preprocessing started...")
     
@@ -171,9 +184,15 @@ def main():
     }
     
     comparison_output = docs_dir / "comparison_data.json"
+    root_comparison_output = workspace_dir / "comparison_data.json"
+    cleaned_comparison = clean_nan(comparison_data)
+    
     with open(comparison_output, 'w', encoding='utf-8') as f:
-        json.dump(comparison_data, f, ensure_ascii=False, indent=2)
-    print(f"[+] Saved comparison data to {comparison_output}")
+        json.dump(cleaned_comparison, f, ensure_ascii=False, indent=2)
+    with open(root_comparison_output, 'w', encoding='utf-8') as f:
+        json.dump(cleaned_comparison, f, ensure_ascii=False, indent=2)
+        
+    print(f"[+] Saved comparison data to {comparison_output} and root")
     
     # -------------------------------------------------------------
     # 6. Parcel Data Processing (SHP -> GeoJSON with Zoning Joined)
@@ -254,15 +273,18 @@ def main():
     p_out = workspace_dir / "pangyo_parcels.geojson"
     c_out = workspace_dir / "cheongna_parcels.geojson"
     
+    cleaned_p_geojson = clean_nan(p_geojson)
+    cleaned_c_geojson = clean_nan(c_geojson)
+
     with open(p_out, "w", encoding="utf-8") as f:
-        json.dump(p_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(cleaned_p_geojson, f, ensure_ascii=False, indent=2)
     with open(c_out, "w", encoding="utf-8") as f:
-        json.dump(c_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(cleaned_c_geojson, f, ensure_ascii=False, indent=2)
         
     with open(docs_dir / "pangyo_parcels.geojson", "w", encoding="utf-8") as f:
-        json.dump(p_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(cleaned_p_geojson, f, ensure_ascii=False, indent=2)
     with open(docs_dir / "cheongna_parcels.geojson", "w", encoding="utf-8") as f:
-        json.dump(c_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(cleaned_c_geojson, f, ensure_ascii=False, indent=2)
         
     print(f"[+] Saved Pangyo parcels to {p_out} and docs/")
     print(f"[+] Saved Cheongna parcels to {c_out} and docs/")
