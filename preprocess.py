@@ -70,7 +70,7 @@ def main():
     # 1. Bounding Box & Center Settings (Strict boundaries)
     # -------------------------------------------------------------
     p_bbox_coords = [127.0980, 37.3950, 127.1150, 37.4060]
-    c_bbox_coords = [126.6350, 37.5280, 126.6630, 37.5490]
+    c_bbox_coords = [126.6415, 37.5325, 126.6565, 37.5445]
     
     p_bbox_poly = box(p_bbox_coords[0], p_bbox_coords[1], p_bbox_coords[2], p_bbox_coords[3])
     c_bbox_poly = box(c_bbox_coords[0], c_bbox_coords[1], c_bbox_coords[2], c_bbox_coords[3])
@@ -147,8 +147,9 @@ def main():
     c_gdf = gpd.read_file(c_shp)
     
     # 법정동코드 필터링 (판교: 삼평동, 청라: 청라동)
+    # Cheongna uses legacy codes (2826012200, 2826010600, etc.) in the shapefile, so we include them
     pangyo_dong_prefixes = ('4113510900',)
-    cheongna_dong_prefixes = ('2826010700',)
+    cheongna_dong_prefixes = ('2826010700', '2826012200', '2826010600', '2826010400', '2826011100', '2826011200', '2826011300')
     
     p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith(pangyo_dong_prefixes)].copy()
     c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith(cheongna_dong_prefixes)].copy()
@@ -214,16 +215,16 @@ def main():
         "3102378": "4113511500", # 백현동
         
         # 인천 서구
-        "2826057": "2826011100", # 연희동
-        "2826058": "2826011200", # 경서동
-        "2826059": "2826011300", # 원창동
-        "2826072": "2826011900", # 오류동
-        "2826073": "2826011700", # 마전동
-        "2826074": "2826012300", # 당하동
-        "2826075": "2826012100", # 원당동
-        "2826084": "2826010700", # 청라동
-        "2826085": "2826010700",
-        "2826086": "2826010700",
+        "2308057": "2826011100", # 연희동
+        "2308058": "2826011200", # 경서동
+        "2308059": "2826011300", # 원창동
+        "2308072": "2826011900", # 오류동
+        "2308073": "2826011700", # 마전동
+        "2308074": "2826012300", # 당하동
+        "2308075": "2826012100", # 원당동
+        "2308084": "2826012200", # 청라동 (legacy code in shapefile centroids mapping)
+        "2308085": "2826012200",
+        "2308086": "2826012200",
     }
     
     def build_sgis_gdf(pop_file, work_file, centroids_dict, default_cent):
@@ -246,7 +247,11 @@ def main():
             # Assign coordinate
             geom = None
             if b_dong in centroids_dict and len(centroids_dict[b_dong]) > 0:
-                idx = i % len(centroids_dict[b_dong])
+                try:
+                    val = int(code)
+                except ValueError:
+                    val = i
+                idx = val % len(centroids_dict[b_dong])
                 geom = centroids_dict[b_dong][idx]
             else:
                 geom = default_cent
@@ -368,7 +373,7 @@ def main():
     c_b_df = pd.read_csv(cheongna_b_file, encoding='utf-8-sig')
     
     p_b_filtered = p_b_df[p_b_df['법정동코드'] == 10900].copy() # 삼평동
-    c_b_filtered = c_b_df[c_b_df['법정동코드'] == 10700].copy() # 청라동
+    c_b_filtered = c_b_df[c_b_df['법정동코드'].isin([10700, 12200, 10600, 10400, 11100, 11200, 11300])].copy() # 청라동 including legacy codes
     
     # Calculate LUM
     pangyo_lum = calculate_lum(p_b_filtered)
@@ -395,7 +400,7 @@ def main():
     cheongna_lu_file = workspace_dir / "토지이용" / "AL_D155_28_20241204" / "AL_D155_28_20241204.csv"
     
     pangyo_dong_codes_str = {"4113510900"}
-    cheongna_dong_codes_str = {"2826010700"}
+    cheongna_dong_codes_str = {"2826010700", "2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}
     
     pangyo_lu_raw, p_zoning = process_land_use_fast_local(pangyo_lu_file, pangyo_dong_codes_str, p_pnus_bbox)
     cheongna_lu_raw, c_zoning = process_land_use_fast_local(cheongna_lu_file, cheongna_dong_codes_str, c_pnus_bbox)
