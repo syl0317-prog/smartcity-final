@@ -723,12 +723,12 @@
               <span>60분 대중교통 등시간선 (Isochrone)</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: rgba(56, 189, 248, 0.1); border: 2px solid #38bdf8;"></div>
-              <span>판교 분석 대상 구역</span>
+              <div class="legend-color" style="background-color: rgba(56, 189, 248, 0.15); border: 1.5px solid #ffffff;"></div>
+              <span>판교 분석 대상 구역 (흰색 테두리)</span>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background-color: rgba(244, 114, 182, 0.1); border: 2px solid #f472b6;"></div>
-              <span>청라 분석 대상 구역</span>
+              <div class="legend-color" style="background-color: rgba(244, 114, 182, 0.15); border: 1.5px solid #ffffff;"></div>
+              <span>청라 분석 대상 구역 (흰색 테두리)</span>
             </div>
             <div class="legend-item">
               <div class="legend-color" style="background-color: #ffffff; border: 2px solid #ef4444; border-radius: 50%;"></div>
@@ -807,7 +807,8 @@
     // Centers & Zooms
     const pangyoCenter = [37.3949, 127.1116];
     const cheongnaCenter = [37.5396, 126.6479];
-    const mapZoom = 14;
+    const pangyoZoom = 15;
+    const cheongnaZoom = 14;
 
     // Maps & Layer groups
     const maps = { pangyo: null, cheongna: null };
@@ -956,8 +957,8 @@
         scrollWheelZoom: true
       };
 
-      maps.pangyo = L.map('map-pangyo', mapOptions).setView(pangyoCenter, mapZoom);
-      maps.cheongna = L.map('map-cheongna', mapOptions).setView(cheongnaCenter, mapZoom);
+      maps.pangyo = L.map('map-pangyo', mapOptions).setView(pangyoCenter, pangyoZoom);
+      maps.cheongna = L.map('map-cheongna', mapOptions).setView(cheongnaCenter, cheongnaZoom);
 
       const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
       const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
@@ -1093,20 +1094,20 @@
     // Draw Target Bounding Box Rectangles
     function drawTargetRectangles() {
       // 1. Pangyo Target Rectangle
-      L.rectangle([[37.3920, 127.1050], [37.4000, 127.1200]], {
-        color: '#38bdf8',
+      L.rectangle([[37.3920, 127.0980], [37.4020, 127.1200]], {
+        color: '#ffffff',
         fillColor: '#38bdf8',
-        fillOpacity: 0.05,
-        weight: 2
-      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3920, 127.1050 ~ 37.4000, 127.1200");
+        fillOpacity: 0.02,
+        weight: 2.5
+      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3920, 127.0980 ~ 37.4020, 127.1200");
 
       // 2. Cheongna Target Rectangle
-      L.rectangle([[37.5330, 126.6380], [37.5470, 126.6580]], {
-        color: '#f472b6',
+      L.rectangle([[37.5250, 126.6300], [37.5520, 126.6680]], {
+        color: '#ffffff',
         fillColor: '#f472b6',
-        fillOpacity: 0.05,
-        weight: 2
-      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역 경계</b><br>범위: 37.5330, 126.6380 ~ 37.5470, 126.6580");
+        fillOpacity: 0.02,
+        weight: 2.5
+      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역 경계</b><br>범위: 37.5250, 126.6300 ~ 37.5520, 126.6680");
     }
 
     // Draw Building Footprint layers with styles & popups
@@ -1565,8 +1566,8 @@
         maps.pangyo.invalidateSize();
         maps.cheongna.invalidateSize();
         
-        maps.pangyo.setView(pangyoCenter, mapZoom);
-        maps.cheongna.setView(cheongnaCenter, mapZoom);
+        maps.pangyo.setView(pangyoCenter, pangyoZoom);
+        maps.cheongna.setView(cheongnaCenter, cheongnaZoom);
       } else if (tab === 'pangyo') {
         // Show only Pangyo map
         document.getElementById('map-pangyo').classList.remove('hidden');
@@ -1575,7 +1576,7 @@
         wrapper.className = 'map-wrapper-single';
         
         maps.pangyo.invalidateSize();
-        maps.pangyo.setView(pangyoCenter, mapZoom);
+        maps.pangyo.setView(pangyoCenter, pangyoZoom);
       } else if (tab === 'cheongna') {
         // Show only Cheongna map
         document.getElementById('map-pangyo').classList.add('hidden');
@@ -1584,7 +1585,7 @@
         wrapper.className = 'map-wrapper-single';
         
         maps.cheongna.invalidateSize();
-        maps.cheongna.setView(cheongnaCenter, mapZoom);
+        maps.cheongna.setView(cheongnaCenter, cheongnaZoom);
       }
     }
 
