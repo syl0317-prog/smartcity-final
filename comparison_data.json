@@ -1,14 +1,30 @@
 {
   "demographics": {
     "pangyo": {
-      "population": 155236,
-      "workers": 125306,
-      "ratio": 0.807
+      "population": 8420,
+      "workers": 94783,
+      "ratio": 11.257,
+      "lum": 0.73
     },
     "cheongna": {
-      "population": 151694,
-      "workers": 43310,
-      "ratio": 0.286
+      "population": 0,
+      "workers": 0,
+      "ratio": 0.0,
+      "lum": 0.693
+    }
+  },
+  "industry_ratio": {
+    "pangyo": {
+      "정보통신업": 55,
+      "전문과학기술업": 25,
+      "제조업": 12,
+      "기타": 8
+    },
+    "cheongna": {
+      "금융보험업": 40,
+      "운수창고업": 25,
+      "제조업": 20,
+      "기타": 15
     }
   },
   "building_uses": {

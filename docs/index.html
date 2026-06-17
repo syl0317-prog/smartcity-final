@@ -633,6 +633,11 @@
             <td class="val-pangyo" id="table-pangyo-buildings">-</td>
             <td class="val-cheongna" id="table-cheongna-buildings">-</td>
           </tr>
+          <tr>
+            <td class="indicator-label">토지이용 혼합도 (LUM)</td>
+            <td class="val-pangyo" id="table-pangyo-lum">-</td>
+            <td class="val-cheongna" id="table-cheongna-lum">-</td>
+          </tr>
           <!-- 3-3 Isochrone Transit Reachability Rows -->
           <tr style="background-color: rgba(239, 68, 68, 0.03);">
             <td class="indicator-label" style="color: var(--color-30m); font-weight: 700;">⏱️ 30분 등시간권 도달 인구 (대중교통)</td>
@@ -769,9 +774,17 @@
 
       <!-- Chart Card 2: Land Use Zone Grouped Bar -->
       <div class="chart-card">
-        <h3>🌱 용도지역지구 지정 분포 비교 (3-2)</h3>
+        <h3>🌱 용도지역지구 지정 분포 비교 (3-1)</h3>
         <div class="chart-wrapper">
           <canvas id="zone-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart Card 2.5: Industry Composition Grouped Bar -->
+      <div class="chart-card">
+        <h3>🏢 주요 3대 업종별 종사자 구성 비교 (5)</h3>
+        <div class="chart-wrapper">
+          <canvas id="industry-chart"></canvas>
         </div>
       </div>
 
@@ -841,6 +854,7 @@
     let useChart = null;
     let zoneChart = null;
     let accessibilityChart = null;
+    let industryChart = null;
 
     // Formatting numbers
     function formatNumber(num) {
@@ -980,8 +994,11 @@
       document.getElementById('table-pangyo-ratio').innerText = demo.pangyo.ratio.toFixed(2);
       document.getElementById('table-cheongna-ratio').innerText = demo.cheongna.ratio.toFixed(2);
       
-      document.getElementById('table-pangyo-buildings').innerText = "4,368동";
-      document.getElementById('table-cheongna-buildings').innerText = "2,904동";
+      document.getElementById('table-pangyo-buildings').innerText = formatNumber(pangyoParcelsData.features.length) + "동";
+      document.getElementById('table-cheongna-buildings').innerText = formatNumber(cheongnaParcelsData.features.length) + "동";
+      
+      document.getElementById('table-pangyo-lum').innerText = demo.pangyo.lum ? demo.pangyo.lum.toFixed(3) : "-";
+      document.getElementById('table-cheongna-lum').innerText = demo.cheongna.lum ? demo.cheongna.lum.toFixed(3) : "-";
       
       // Calculate active accessibility values
       const p30 = getIsochroneStats(isochroneData.pangyo_30);
@@ -1416,6 +1433,70 @@
             },
             y: {
               ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            }
+          }
+        }
+      });
+
+      // 2.5. Grouped Bar Chart: Industry Composition Comparison
+      const pInd = comparisonData.industry_ratio.pangyo;
+      const cInd = comparisonData.industry_ratio.cheongna;
+      
+      const indLabels = Array.from(new Set([...Object.keys(pInd), ...Object.keys(cInd)]));
+      const pIndValues = indLabels.map(l => pInd[l] || 0);
+      const cIndValues = indLabels.map(l => cInd[l] || 0);
+      
+      const ctxInd = document.getElementById('industry-chart').getContext('2d');
+      industryChart = new Chart(ctxInd, {
+        type: 'bar',
+        data: {
+          labels: indLabels,
+          datasets: [
+            {
+              label: '판교 (Pangyo)',
+              data: pIndValues,
+              backgroundColor: '#38bdf8',
+              borderColor: '#0284c7',
+              borderWidth: 1,
+              borderRadius: 4
+            },
+            {
+              label: '청라 (Cheongna)',
+              data: cIndValues,
+              backgroundColor: '#f472b6',
+              borderColor: '#db2777',
+              borderWidth: 1,
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.raw + '%';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              grid: { display: false }
+            },
+            y: {
+              ticks: { 
+                color: '#94a3b8', 
+                font: { size: 9, family: 'Inter' },
+                callback: function(value) { return value + '%'; }
+              },
               grid: { color: 'rgba(255, 255, 255, 0.05)' }
             }
           }
