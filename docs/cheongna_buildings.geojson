@@ -106,7 +106,7 @@
         "floors_down": 0,
         "approved_year": "2017",
         "address": "인천광역시 서구 청라동 9-73번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -148,7 +148,7 @@
         "floors_down": 0,
         "approved_year": "2024",
         "address": "인천광역시 서구 청라동 155-5번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -190,7 +190,7 @@
         "floors_down": 0,
         "approved_year": "2011",
         "address": "인천광역시 서구 청라동 129-7번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -232,7 +232,7 @@
         "floors_down": 0,
         "approved_year": "2020",
         "address": "인천광역시 서구 청라동 104-96번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -5040,7 +5040,7 @@
         "floors_down": 0,
         "approved_year": "2015",
         "address": "인천광역시 서구 청라동 62-32번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -5138,7 +5138,7 @@
         "floors_down": 0,
         "approved_year": "2016",
         "address": "인천광역시 서구 청라동 122-3번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -5384,7 +5384,7 @@
         "floors_down": 1,
         "approved_year": "2021",
         "address": "인천광역시 서구 청라동 140-2번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -5434,7 +5434,7 @@
         "floors_down": 2,
         "approved_year": "2012",
         "address": "인천광역시 서구 청라동 102-3번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -5650,7 +5650,7 @@
         "floors_down": 0,
         "approved_year": "2015",
         "address": "인천광역시 서구 청라동 176-6번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13080,7 +13080,7 @@
         "floors_down": 0,
         "approved_year": "2015",
         "address": "인천광역시 서구 청라동 131-18번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13126,7 +13126,7 @@
         "floors_down": 0,
         "approved_year": "2011",
         "address": "인천광역시 서구 청라동 129-7번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13168,7 +13168,7 @@
         "floors_down": 0,
         "approved_year": "2014",
         "address": "인천광역시 서구 청라동 105-6번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13210,7 +13210,7 @@
         "floors_down": 4,
         "approved_year": "2012",
         "address": "인천광역시 서구 청라동 167-16번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13252,7 +13252,7 @@
         "floors_down": 0,
         "approved_year": "2017",
         "address": "인천광역시 서구 청라동 111-24번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13294,7 +13294,7 @@
         "floors_down": 0,
         "approved_year": "2019",
         "address": "인천광역시 서구 청라동 9-31번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     },
     {
@@ -13336,7 +13336,7 @@
         "floors_down": 1,
         "approved_year": "2021",
         "address": "인천광역시 서구 청라동 153-4번지",
-        "osm_type": NaN
+        "osm_type": null
       }
     }
   ]
