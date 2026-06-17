@@ -928,7 +928,10 @@
     }
 
     // Calculate Isochrone Reachability Stats Dynamically without double counting
-    function getIsochroneStats(stationsList) {
+    function getIsochroneStats(stationsList, key) {
+      if (isochroneData.totals && isochroneData.totals[key]) {
+        return isochroneData.totals[key];
+      }
       const seen = new Set();
       let pop = 0;
       let work = 0;
@@ -1029,10 +1032,10 @@
       document.getElementById('table-cheongna-lum').innerText = demo.cheongna.lum ? demo.cheongna.lum.toFixed(3) : "-";
       
       // Calculate active accessibility values
-      const p30 = getIsochroneStats(isochroneData.pangyo_30);
-      const p60 = getIsochroneStats(isochroneData.pangyo_60);
-      const c30 = getIsochroneStats(isochroneData.cheongna_30);
-      const c60 = getIsochroneStats(isochroneData.cheongna_60);
+      const p30 = getIsochroneStats(isochroneData.pangyo_30, 'pangyo_30');
+      const p60 = getIsochroneStats(isochroneData.pangyo_60, 'pangyo_60');
+      const c30 = getIsochroneStats(isochroneData.cheongna_30, 'cheongna_30');
+      const c60 = getIsochroneStats(isochroneData.cheongna_60, 'cheongna_60');
       
       document.getElementById('table-pangyo-pop30').innerText = formatNumber(p30.population) + "명 (" + p30.stations + "개 역)";
       document.getElementById('table-cheongna-pop30').innerText = formatNumber(c30.population) + "명 (" + c30.stations + "개 역)";
@@ -1331,8 +1334,8 @@
         cList = isochroneData.cheongna_60;
       }
 
-      const pStats = getIsochroneStats(pList);
-      const cStats = getIsochroneStats(cList);
+      const pStats = getIsochroneStats(pList, activeTime === '30' ? 'pangyo_30' : 'pangyo_60');
+      const cStats = getIsochroneStats(cList, activeTime === '30' ? 'cheongna_30' : 'cheongna_60');
 
       document.getElementById('stat-pangyo-stations').innerText = formatNumber(pStats.stations) + '개';
       document.getElementById('stat-pangyo-pop').innerText = formatNumber(pStats.population) + '명';

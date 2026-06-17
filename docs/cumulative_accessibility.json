@@ -3,160 +3,160 @@
     {
       "time": 0,
       "stations": 1,
-      "population": 28500,
-      "workers": 89400
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 5,
       "stations": 4,
-      "population": 93300,
-      "workers": 134500
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 10,
       "stations": 9,
-      "population": 135000,
-      "workers": 154800
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 15,
       "stations": 18,
-      "population": 246200,
-      "workers": 225200
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 20,
       "stations": 28,
-      "population": 289200,
-      "workers": 243800
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 25,
-      "stations": 44,
-      "population": 301600,
-      "workers": 247900
+      "stations": 43,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 30,
-      "stations": 76,
-      "population": 319600,
-      "workers": 342900
+      "stations": 72,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 35,
-      "stations": 109,
-      "population": 319600,
-      "workers": 342900
+      "stations": 100,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 40,
-      "stations": 157,
-      "population": 319600,
-      "workers": 342900
+      "stations": 131,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 45,
-      "stations": 231,
-      "population": 348600,
-      "workers": 394900
+      "stations": 187,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 50,
-      "stations": 313,
-      "population": 372600,
-      "workers": 439900
+      "stations": 251,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 55,
-      "stations": 384,
-      "population": 394600,
-      "workers": 487900
+      "stations": 298,
+      "population": 5271,
+      "workers": 35025
     },
     {
       "time": 60,
-      "stations": 443,
-      "population": 406600,
-      "workers": 522900
+      "stations": 343,
+      "population": 5271,
+      "workers": 35025
     }
   ],
   "cheongna": [
     {
       "time": 0,
       "stations": 1,
-      "population": 38200,
-      "workers": 11500
+      "population": 0,
+      "workers": 0
     },
     {
       "time": 5,
       "stations": 2,
-      "population": 66600,
-      "workers": 17100
+      "population": 0,
+      "workers": 0
     },
     {
       "time": 10,
       "stations": 3,
-      "population": 81100,
-      "workers": 19500
+      "population": 0,
+      "workers": 0
     },
     {
       "time": 15,
       "stations": 5,
-      "population": 132000,
-      "workers": 31100
+      "population": 0,
+      "workers": 0
     },
     {
       "time": 20,
       "stations": 14,
-      "population": 144100,
-      "workers": 78600
+      "population": 23499,
+      "workers": 9532
     },
     {
       "time": 25,
-      "stations": 22,
-      "population": 144100,
-      "workers": 78600
+      "stations": 21,
+      "population": 25022,
+      "workers": 10119
     },
     {
       "time": 30,
-      "stations": 38,
-      "population": 144100,
-      "workers": 78600
+      "stations": 35,
+      "population": 35650,
+      "workers": 15270
     },
     {
       "time": 35,
-      "stations": 51,
-      "population": 166100,
-      "workers": 126600
+      "stations": 48,
+      "population": 37334,
+      "workers": 17619
     },
     {
       "time": 40,
-      "stations": 73,
-      "population": 219100,
-      "workers": 223600
+      "stations": 70,
+      "population": 37577,
+      "workers": 17621
     },
     {
       "time": 45,
-      "stations": 98,
-      "population": 237100,
-      "workers": 318600
+      "stations": 95,
+      "population": 37577,
+      "workers": 17621
     },
     {
       "time": 50,
-      "stations": 150,
-      "population": 237100,
-      "workers": 318600
+      "stations": 147,
+      "population": 37805,
+      "workers": 17670
     },
     {
       "time": 55,
-      "stations": 187,
-      "population": 237100,
-      "workers": 318600
+      "stations": 183,
+      "population": 37805,
+      "workers": 17670
     },
     {
       "time": 60,
-      "stations": 234,
-      "population": 237100,
-      "workers": 318600
+      "stations": 228,
+      "population": 37805,
+      "workers": 17670
     }
   ]
 }

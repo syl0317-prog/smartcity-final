@@ -5,7 +5,7 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import networkx as nx
-from shapely.geometry import box, Point, MultiPoint
+from shapely.geometry import box, Point
 
 def clean_nan(obj):
     import math
@@ -29,11 +29,13 @@ def calculate_lum(df):
         if not use_name or pd.isna(use_name):
             return '기타'
         use_name = str(use_name)
+        if any(w in use_name for w in ['공장', '창고', '창고시설']):
+            return '기타'
         if any(w in use_name for w in ['단독주택', '공동주택', '아파트', '다세대', '다가구', '기숙사', '주거']):
             return '주거'
         elif any(w in use_name for w in ['업무', '근린생활', '판매', '숙박', '위락', '상업', '오피스텔']):
             return '상업'
-        elif any(w in use_name for w in ['공장', '창고', '위험물', '자동차', '산업']):
+        elif any(w in use_name for w in ['위험물', '자동차', '산업']):
             return '공업'
         elif any(w in use_name for w in ['교육연구', '의료', '운동', '문화', '노유자', '공공', '종교', '교육', '과학']):
             return '공공/교육'
@@ -59,6 +61,244 @@ def calculate_lum(df):
     lum_val = entropy / np.log(k)
     return round(float(lum_val), 3)
 
+def clean_use_name(use_name):
+    if not use_name or pd.isna(use_name):
+        return '기타'
+    use_name = str(use_name).strip()
+    if use_name in ['공장', '창고시설', '창고']:
+        return '기타'
+    return use_name
+
+def get_use_stats(df):
+    df = df.copy()
+    df['연면적_num'] = pd.to_numeric(df['연면적(㎡)'], errors='coerce').fillna(0)
+    
+    # We define the target categories to keep them front and center in the comparison
+    target_categories = ['업무시설', '교육연구시설', '공동주택', '단독주택', '근린생활시설']
+    
+    use_sums = {cat: 0.0 for cat in target_categories}
+    use_sums['기타'] = 0.0
+    
+    for _, row in df.iterrows():
+        use_name = str(row['주용도코드명']).strip() if pd.notna(row['주용도코드명']) else '기타'
+        area = float(row['연면적_num'])
+        
+        matched = False
+        for cat in target_categories:
+            if cat in use_name:
+                use_sums[cat] += area
+                matched = True
+                break
+                
+        if not matched:
+            use_sums['기타'] += area
+            
+    return {k: int(round(v)) for k, v in use_sums.items()}
+
+def build_pnu_from_register(df):
+    df = df.copy()
+    df['대지구분코드'] = df['대지구분코드'].fillna(0).astype(int)
+    df['번'] = df['번'].fillna(0).astype(int)
+    df['지'] = df['지'].fillna(0).astype(int)
+    df['시군구코드'] = df['시군구코드'].astype(str)
+    df['법정동코드_str'] = df['법정동코드'].astype(str).str.zfill(5)
+    
+    land_type = df['대지구분코드'].apply(lambda x: '2' if x == 2 else '1')
+    pnu_series = (
+        df['시군구코드'] + 
+        df['법정동코드_str'] + 
+        land_type + 
+        df['번'].astype(str).str.zfill(4) + 
+        df['지'].astype(str).str.zfill(4)
+    )
+    df['PNU'] = pnu_series
+    return df
+
+def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sgis_gdf):
+    max_seconds = max_minutes * 60
+    results = []
+    
+    for node_id, seconds in durations_dict.items():
+        if pd.notna(seconds) and not np.isinf(seconds) and seconds <= max_seconds:
+            match = nodes_dataframe[nodes_dataframe['id'] == node_id]
+            if match.empty:
+                continue
+            node_info = match.iloc[0]
+            stat_name = str(node_info['statnm'])
+            
+            lng = node_info['lng']
+            lat = node_info['lat']
+            x_5179 = node_info['x_5179']
+            y_5179 = node_info['y_5179']
+            if pd.isna(lng) or pd.isna(lat) or pd.isna(x_5179) or pd.isna(y_5179):
+                continue
+            
+            # Create 1km Buffer
+            buffer_geom = Point(x_5179, y_5179).buffer(1000)
+            buffer_gdf = gpd.GeoDataFrame(geometry=[buffer_geom], crs="epsg:5179")
+            
+            # Spatial join (how='left' and fillna(0) as requested)
+            joined = gpd.sjoin(buffer_gdf, sgis_gdf, how="left", predicate="contains")
+            pop_sum = int(joined['population'].fillna(0).sum())
+            work_sum = int(joined['workers'].fillna(0).sum())
+            
+            results.append({
+                "id": int(node_id),
+                "name": stat_name,
+                "line": str(node_info['linenm']),
+                "lng": float(lng),
+                "lat": float(lat),
+                "time_seconds": round(seconds, 2),
+                "time_minutes": round(seconds / 60.0, 2),
+                "population": pop_sum,
+                "workers": work_sum
+            })
+    return sorted(results, key=lambda x: x['time_seconds'])
+
+def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgis_gdf):
+    max_seconds = max_minutes * 60
+    station_points = []
+    station_names = set()
+    
+    for node_id, seconds in durations_dict.items():
+        if pd.notna(seconds) and not np.isinf(seconds) and seconds <= max_seconds:
+            match = nodes_dataframe[nodes_dataframe['id'] == node_id]
+            if match.empty:
+                continue
+            node_info = match.iloc[0]
+            stat_name = str(node_info['statnm'])
+            x_5179 = node_info['x_5179']
+            y_5179 = node_info['y_5179']
+            if pd.isna(x_5179) or pd.isna(y_5179):
+                continue
+            station_points.append(Point(x_5179, y_5179))
+            station_names.add(stat_name)
+            
+    if not station_points:
+        return {"stations": 0, "population": 0, "workers": 0}
+        
+    # Create 1km buffers around reachable stations
+    buffers = [pt.buffer(1000) for pt in station_points]
+    buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="epsg:5179")
+    
+    # Left join to preserve all buffers, then map to SGIS
+    joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="left", predicate="contains")
+    joined_valid = joined.dropna(subset=['code'])
+    
+    # Group by/Deduplicate unique SGIS block codes (adm_cd / code) to avoid overlap double-counting
+    unique_joined = joined_valid.drop_duplicates(subset=['code'])
+    
+    pop_sum = int(unique_joined['population'].fillna(0).sum())
+    work_sum = int(unique_joined['workers'].fillna(0).sum())
+    
+    return {
+        "stations": len(station_names),
+        "population": pop_sum,
+        "workers": work_sum
+    }
+
+def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf):
+    results = []
+    # 0 to 60 minutes with 5-minute steps
+    for mins in range(0, 65, 5):
+        max_seconds = mins * 60
+        station_points = []
+        station_names = set()
+        
+        for node_id, seconds in durations_dict.items():
+            if pd.notna(seconds) and not np.isinf(seconds) and seconds <= max_seconds:
+                match = nodes_dataframe[nodes_dataframe['id'] == node_id]
+                if match.empty:
+                    continue
+                node_info = match.iloc[0]
+                stat_name = str(node_info['statnm'])
+                x_5179 = node_info['x_5179']
+                y_5179 = node_info['y_5179']
+                if pd.isna(x_5179) or pd.isna(y_5179):
+                    continue
+                station_points.append(Point(x_5179, y_5179))
+                station_names.add(stat_name)
+                
+        if not station_points:
+            results.append({
+                "time": mins,
+                "stations": 0,
+                "population": 0,
+                "workers": 0
+            })
+            continue
+            
+        buffers = [pt.buffer(1000) for pt in station_points]
+        buffers_gdf = gpd.GeoDataFrame(geometry=buffers, crs="epsg:5179")
+        
+        joined = gpd.sjoin(buffers_gdf, sgis_gdf, how="left", predicate="contains")
+        joined_valid = joined.dropna(subset=['code'])
+        unique_joined = joined_valid.drop_duplicates(subset=['code'])
+        
+        pop_sum = int(unique_joined['population'].fillna(0).sum())
+        work_sum = int(unique_joined['workers'].fillna(0).sum())
+        
+        results.append({
+            "time": mins,
+            "stations": len(station_names),
+            "population": pop_sum,
+            "workers": work_sum
+        })
+    return results
+
+def process_land_use_fast_local(file_path, target_dong_codes, target_pnus):
+    zone_counts = {}
+    zoning_dict = {}
+    if not file_path.exists():
+        print(f"  [!] Warning: Land use file {file_path} not found.")
+        return zone_counts, {}
+    
+    print(f"  [*] Stream-parsing {file_path.name}...")
+    with open(file_path, 'r', encoding='cp949') as f:
+        header = f.readline()
+        cols = [c.strip('"') for c in header.split(',')]
+        
+        idx_pnu = cols.index('고유번호') if '고유번호' in cols else 0
+        idx_dong = cols.index('법정동코드') if '법정동코드' in cols else 1
+        idx_zone = cols.index('용도지역지구명') if '용도지역지구명' in cols else 10
+        idx_code = cols.index('용도지역지구코드') if '용도지역지구코드' in cols else 9
+        
+        for line in f:
+            row = line.split(',')
+            if len(row) > max(idx_pnu, idx_dong, idx_zone, idx_code):
+                dong = row[idx_dong].strip('"')
+                pnu = row[idx_pnu].strip('"')
+                
+                # Cheongna legacy dong codes mapped to 2826010700
+                if dong in {"2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}:
+                    dong = "2826010700"
+                    for prefix in ["2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"]:
+                        if pnu.startswith(prefix):
+                            pnu = "2826010700" + pnu[10:]
+                            break
+                            
+                if dong in target_dong_codes:
+                    zone = row[idx_zone].strip('"')
+                    code = row[idx_code].strip('"')
+                    if zone:
+                        zone_counts[zone] = zone_counts.get(zone, 0) + 1
+                        if code.startswith('UQA'):
+                            if pnu in target_pnus:
+                                zoning_dict.setdefault(pnu, set()).add((code, zone))
+                            
+    def get_priority_key(item):
+        c, n = item
+        is_detailed = 1 if c not in ['UQA001', 'UQA002', 'UQA003', 'UQA004', 'UQA000'] else 0
+        name_len = len(n) if n else 0
+        return (is_detailed, name_len, c)
+
+    zoning_str_dict = {}
+    for k, v in zoning_dict.items():
+        sorted_items = sorted(list(v), key=get_priority_key, reverse=True)
+        zoning_str_dict[k] = ", ".join([item[1] for item in sorted_items])
+        
+    return zone_counts, zoning_str_dict
+
 def main():
     print("[*] Preprocessing started...")
     
@@ -66,17 +306,25 @@ def main():
     docs_dir = workspace_dir / "docs"
     docs_dir.mkdir(exist_ok=True)
     
+    # 1. Cheongna Legacy Mapping Configs
+    cheongna_legacy_prefixes = ['2826012200', '2826010600', '2826010400', '2826011100', '2826011200', '2826011300']
+    cheongna_legacy_b_codes = {12200, 10600, 10400, 11100, 11200, 11300}
+    
+    def map_cheongna_pnu(pnu_val):
+        p_str = str(pnu_val)
+        for prefix in cheongna_legacy_prefixes:
+            if p_str.startswith(prefix):
+                return '2826010700' + p_str[10:]
+        return p_str
+        
     # -------------------------------------------------------------
-    # 1. Bounding Box & Center Settings (Strict boundaries)
+    # 2. Bounding Box & Center Settings (Strict boundaries)
     # -------------------------------------------------------------
     p_bbox_coords = [127.0980, 37.3950, 127.1150, 37.4060]
-    c_bbox_coords = [126.6415, 37.5325, 126.6565, 37.5445]
-    
     p_bbox_poly = box(p_bbox_coords[0], p_bbox_coords[1], p_bbox_coords[2], p_bbox_coords[3])
-    c_bbox_poly = box(c_bbox_coords[0], c_bbox_coords[1], c_bbox_coords[2], c_bbox_coords[3])
     
     # -------------------------------------------------------------
-    # 2. Subway Network - Active Lines (<= 2024) Dijkstra Isochrone Building
+    # 3. Subway Network - Active Lines (<= 2024) Dijkstra Isochrone Building
     # -------------------------------------------------------------
     print("[*] Running Dijkstra path-finding on Active Subway network (<= 2024)...")
     nodes_file = workspace_dir / "subway_network" / "network" / "nodes.tsv"
@@ -137,38 +385,42 @@ def main():
     cheongna_durations = nx.multi_source_dijkstra_path_length(G, cheongna_nodes, weight='weight')
     
     # -------------------------------------------------------------
-    # 3. Load Parcel Shapefiles & Strict Clip (to get PNUs and Centroids)
+    # 4. Load Parcel Shapefiles & Strict Clip (to get PNUs and Centroids)
     # -------------------------------------------------------------
-    print("[*] Loading parcel shapefiles & strictly clipping with boundary bbox...")
+    print("[*] Loading parcel shapefiles & strictly clipping...")
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
     
     p_gdf = gpd.read_file(p_shp)
     c_gdf = gpd.read_file(c_shp)
     
-    # 법정동코드 필터링 (판교: 삼평동, 청라: 청라동)
-    # Cheongna uses legacy codes (2826012200, 2826010600, etc.) in the shapefile, so we include them
-    pangyo_dong_prefixes = ('4113510900',)
-    cheongna_dong_prefixes = ('2826010700', '2826012200', '2826010600', '2826010400', '2826011100', '2826011200', '2826011300')
+    # Map legacy PNU prefixes for Cheongna shapefile
+    c_gdf['PNU'] = c_gdf['PNU'].apply(map_cheongna_pnu)
     
-    p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith(pangyo_dong_prefixes)].copy()
-    c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith(cheongna_dong_prefixes)].copy()
+    # 법정동코드 필터링 (정확한 == 일치 연산)
+    p_box = p_gdf[p_gdf['PNU'].astype(str).str.slice(0, 10) == '4113510900'].copy()
+    c_box = c_gdf[c_gdf['PNU'].astype(str).str.slice(0, 10) == '2826010700'].copy()
     
-    p_box = p_box.to_crs(epsg=4326)
-    c_box = c_box.to_crs(epsg=4326)
+    # All spatial calculations must occur in EPSG:5179 (UTM-K)
+    p_box_5179 = p_box.to_crs(epsg=5179)
+    c_box_5179 = c_box.to_crs(epsg=5179)
     
-    # Keep whole polygons intersecting with the BBox (no cutting of polygons)
-    p_box_clipped = p_box[p_box.geometry.intersects(p_bbox_poly)].copy()
-    c_box_clipped = c_box[c_box.geometry.intersects(c_bbox_poly)].copy()
+    # Clip Pangyo using its Bounding Box (reprojected to 5179)
+    p_bbox_poly_5179 = gpd.GeoSeries([p_bbox_poly], crs="epsg:4326").to_crs(epsg=5179).iloc[0]
+    p_box_clipped = p_box_5179[p_box_5179.geometry.intersects(p_bbox_poly_5179)].copy()
     
-    # Centroids list for Dong mapping
-    p_centroids_5179 = p_gdf.to_crs(epsg=5179).copy()
+    # Clip Cheongna using cheongna_ibd.geojson (International Business District boundary, projected to 5179)
+    cheongna_ibd_gdf = gpd.read_file(workspace_dir / "cheongna_ibd.geojson").to_crs(epsg=5179)
+    c_box_clipped = gpd.sjoin(c_box_5179, cheongna_ibd_gdf, how="inner", predicate="intersects")
+    c_box_clipped = c_box_clipped[c_box_5179.columns].copy() # keep original columns
+    
+    # Centroids list for Demographics Dong mapping
+    p_centroids_5179 = p_box_5179.copy()
     p_centroids_5179['centroid'] = p_centroids_5179.geometry.centroid
     
-    c_centroids_5179 = c_gdf.to_crs(epsg=5179).copy()
+    c_centroids_5179 = c_box_5179.copy()
     c_centroids_5179['centroid'] = c_centroids_5179.geometry.centroid
     
-    # Create Dong-Centroid lists
     p_dong_centroids = {}
     for pnu, cent in zip(p_centroids_5179['PNU'], p_centroids_5179['centroid']):
         p_prefix = str(pnu)[:10]
@@ -179,14 +431,13 @@ def main():
         c_prefix = str(pnu)[:10]
         c_dong_centroids.setdefault(c_prefix, []).append(cent)
         
-    # Default fallback centroids
     p_default_cent = p_centroids_5179['centroid'].iloc[0] if not p_centroids_5179.empty else Point(955000, 1930000)
     c_default_cent = c_centroids_5179['centroid'].iloc[0] if not c_centroids_5179.empty else Point(925000, 1940000)
 
     # -------------------------------------------------------------
-    # 4. Build SGIS Demographics Point GeoDataFrame (UTM-K, EPSG:5179)
+    # 5. Build SGIS Demographics Point GeoDataFrame (UTM-K, EPSG:5179)
     # -------------------------------------------------------------
-    print("[*] Processing SGIS demographics and mapping to coordinates...")
+    print("[*] Processing SGIS demographics...")
     incheon_pop_file = workspace_dir / "SGIS" / "23080_2024년_인구총괄(총인구).csv"
     bundang_pop_file = workspace_dir / "SGIS" / "31023_2024년_인구총괄(총인구).csv"
     incheon_work_file = workspace_dir / "SGIS" / "23080_2023년_산업분류별(10차_대분류)_총괄종사자수.csv"
@@ -222,7 +473,7 @@ def main():
         "2308073": "2826011700", # 마전동
         "2308074": "2826012300", # 당하동
         "2308075": "2826012100", # 원당동
-        "2308084": "2826012200", # 청라동 (legacy code in shapefile centroids mapping)
+        "2308084": "2826012200", # 청라동
         "2308085": "2826012200",
         "2308086": "2826012200",
     }
@@ -244,7 +495,10 @@ def main():
             h_dong = code[:7]
             b_dong = dong_mapping.get(h_dong, "")
             
-            # Assign coordinate
+            # Map legacy Cheongna dongs to 2826010700
+            if b_dong in {"2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}:
+                b_dong = "2826010700"
+                
             geom = None
             if b_dong in centroids_dict and len(centroids_dict[b_dong]) > 0:
                 try:
@@ -272,66 +526,33 @@ def main():
     c_sgis_gdf = build_sgis_gdf(incheon_pop_file, incheon_work_file, c_dong_centroids, c_default_cent)
     
     # -------------------------------------------------------------
-    # 5. Spatial Join: Station Accessibility Buffers & Isochrones
+    # 6. Spatial Join: Station Accessibility Buffers & Isochrones
     # -------------------------------------------------------------
     print("[*] Performing spatial joins for station catchments...")
-    
-    # 1km Buffers for stations
-    def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sgis_gdf):
-        max_seconds = max_minutes * 60
-        results = []
-        
-        for node_id, seconds in durations_dict.items():
-            if pd.notna(seconds) and not np.isinf(seconds) and seconds <= max_seconds:
-                match = nodes_dataframe[nodes_dataframe['id'] == node_id]
-                if match.empty:
-                    continue
-                node_info = match.iloc[0]
-                stat_name = str(node_info['statnm'])
-                
-                # Check coordinates
-                lng = node_info['lng']
-                lat = node_info['lat']
-                x_5179 = node_info['x_5179']
-                y_5179 = node_info['y_5179']
-                if pd.isna(lng) or pd.isna(lat) or pd.isna(x_5179) or pd.isna(y_5179):
-                    continue
-                
-                # Create 1km Buffer
-                buffer_geom = Point(x_5179, y_5179).buffer(1000)
-                buffer_gdf = gpd.GeoDataFrame(geometry=[buffer_geom], crs="epsg:5179")
-                
-                # Spatial join
-                joined = gpd.sjoin(buffer_gdf, sgis_gdf, how="left", predicate="contains")
-                pop_sum = int(joined['population'].fillna(0).sum())
-                work_sum = int(joined['workers'].fillna(0).sum())
-                
-                results.append({
-                    "id": int(node_id),
-                    "name": stat_name,
-                    "line": str(node_info['linenm']),
-                    "lng": float(lng),
-                    "lat": float(lat),
-                    "time_seconds": round(seconds, 2),
-                    "time_minutes": round(seconds / 60.0, 2),
-                    "population": pop_sum,
-                    "workers": work_sum
-                })
-        return sorted(results, key=lambda x: x['time_seconds'])
-        
     pangyo_30_stats = calculate_station_catchment(pangyo_durations, 30, nodes_df, p_sgis_gdf)
     pangyo_60_stats = calculate_station_catchment(pangyo_durations, 60, nodes_df, p_sgis_gdf)
     cheongna_30_stats = calculate_station_catchment(cheongna_durations, 30, nodes_df, c_sgis_gdf)
     cheongna_60_stats = calculate_station_catchment(cheongna_durations, 60, nodes_df, c_sgis_gdf)
     
+    # Deduplicated totals for the whole isochrone
+    pangyo_30_total = calculate_isochrone_totals(pangyo_durations, 30, nodes_df, p_sgis_gdf)
+    pangyo_60_total = calculate_isochrone_totals(pangyo_durations, 60, nodes_df, p_sgis_gdf)
+    cheongna_30_total = calculate_isochrone_totals(cheongna_durations, 30, nodes_df, c_sgis_gdf)
+    cheongna_60_total = calculate_isochrone_totals(cheongna_durations, 60, nodes_df, c_sgis_gdf)
+    
     isochrone_data = {
         "pangyo_30": pangyo_30_stats,
         "pangyo_60": pangyo_60_stats,
         "cheongna_30": cheongna_30_stats,
-        "cheongna_60": cheongna_60_stats
+        "cheongna_60": cheongna_60_stats,
+        "totals": {
+            "pangyo_30": pangyo_30_total,
+            "pangyo_60": pangyo_60_total,
+            "cheongna_30": cheongna_30_total,
+            "cheongna_60": cheongna_60_total
+        }
     }
     
-    # Save Isochrone json
     isochrone_output = docs_dir / "subway_isochrone.json"
     root_isochrone_output = workspace_dir / "subway_isochrone.json"
     cleaned_isochrone = clean_nan(isochrone_data)
@@ -339,20 +560,34 @@ def main():
         json.dump(cleaned_isochrone, f, ensure_ascii=False, indent=2)
     with open(root_isochrone_output, 'w', encoding='utf-8') as f:
         json.dump(cleaned_isochrone, f, ensure_ascii=False, indent=2)
-        
     print(f"[+] Saved updated subway isochrones to {isochrone_output}")
     
-    # -------------------------------------------------------------
-    # 6. Base Region Demographics (Filtered strictly inside boundary BBox)
-    # -------------------------------------------------------------
-    print("[*] Calculating strict BBox demographics...")
+    # Calculate cumulative accessibility data (for chart)
+    print("[*] Calculating cumulative accessibility...")
+    pangyo_cum = calculate_cumulative_accessibility(pangyo_durations, nodes_df, p_sgis_gdf)
+    cheongna_cum = calculate_cumulative_accessibility(cheongna_durations, nodes_df, c_sgis_gdf)
     
-    p_bbox_poly_5179 = gpd.GeoSeries([p_bbox_poly], crs="epsg:4326").to_crs(epsg=5179).iloc[0]
-    c_bbox_poly_5179 = gpd.GeoSeries([c_bbox_poly], crs="epsg:4326").to_crs(epsg=5179).iloc[0]
+    cumulative_data = {
+        "pangyo": pangyo_cum,
+        "cheongna": cheongna_cum
+    }
+    cum_output = docs_dir / "cumulative_accessibility.json"
+    root_cum_output = workspace_dir / "cumulative_accessibility.json"
+    cleaned_cum = clean_nan(cumulative_data)
+    with open(cum_output, 'w', encoding='utf-8') as f:
+        json.dump(cleaned_cum, f, ensure_ascii=False, indent=2)
+    with open(root_cum_output, 'w', encoding='utf-8') as f:
+        json.dump(cleaned_cum, f, ensure_ascii=False, indent=2)
+    print(f"[+] Saved cumulative accessibility to {cum_output}")
     
-    # Filter SGIS points inside BBox
+    # -------------------------------------------------------------
+    # 7. Base Region Demographics (Filtered strictly inside boundary BBox/IBD)
+    # -------------------------------------------------------------
+    print("[*] Calculating boundary demographics...")
+    cheongna_ibd_poly = cheongna_ibd_gdf.geometry.unary_union
+    
     p_sgis_bbox = p_sgis_gdf[p_sgis_gdf.geometry.within(p_bbox_poly_5179)].copy()
-    c_sgis_bbox = c_sgis_gdf[c_sgis_gdf.geometry.within(c_bbox_poly_5179)].copy()
+    c_sgis_bbox = c_sgis_gdf[c_sgis_gdf.geometry.within(cheongna_ibd_poly)].copy()
     
     pangyo_pop = int(p_sgis_bbox['population'].sum())
     pangyo_workers = int(p_sgis_bbox['workers'].sum())
@@ -363,7 +598,7 @@ def main():
     cheongna_ratio = round(cheongna_workers / cheongna_pop, 3) if cheongna_pop > 0 else 0.0
     
     # -------------------------------------------------------------
-    # 7. Gross Floor Area (연면적) Building Uses & LUM Calculations
+    # 8. Gross Floor Area (연면적) Building Uses & LUM Calculations
     # -------------------------------------------------------------
     print("[*] Parsing building CSV files and computing LUM...")
     pangyo_b_file = workspace_dir / "건축물대장" / "pangyo_building.csv.csv"
@@ -372,23 +607,26 @@ def main():
     p_b_df = pd.read_csv(pangyo_b_file, encoding='utf-8-sig')
     c_b_df = pd.read_csv(cheongna_b_file, encoding='utf-8-sig')
     
-    p_b_filtered = p_b_df[p_b_df['법정동코드'] == 10900].copy() # 삼평동
-    c_b_filtered = c_b_df[c_b_df['법정동코드'].isin([10700, 12200, 10600, 10400, 11100, 11200, 11300])].copy() # 청라동 including legacy codes
+    # Map legacy building codes in c_b_df
+    c_b_df['법정동코드'] = c_b_df['법정동코드'].replace({c: 10700 for c in cheongna_legacy_b_codes})
+    
+    # Build PNU first
+    p_b_clean_all = build_pnu_from_register(p_b_df)
+    c_b_clean_all = build_pnu_from_register(c_b_df)
+    
+    # Filter by exact legal dong code
+    p_b_filtered = p_b_clean_all[p_b_clean_all['법정동코드'] == 10900].copy()
+    c_b_filtered = c_b_clean_all[c_b_clean_all['법정동코드'] == 10700].copy()
+    
+    # Filter buildings strictly inside final parcels (clipping check)
+    p_b_filtered = p_b_filtered[p_b_filtered['PNU'].isin(p_box_clipped['PNU'])].copy()
+    c_b_filtered = c_b_filtered[c_b_filtered['PNU'].isin(c_box_clipped['PNU'])].copy()
     
     # Calculate LUM
     pangyo_lum = calculate_lum(p_b_filtered)
     cheongna_lum = calculate_lum(c_b_filtered)
     
-    def get_use_stats(df):
-        df = df.copy()
-        df['연면적_num'] = pd.to_numeric(df['연면적(㎡)'], errors='coerce').fillna(0)
-        area_sums = df.groupby('주용도코드명')['연면적_num'].sum().sort_values(ascending=False)
-        top5 = area_sums.head(5).to_dict()
-        others_sum = area_sums.iloc[5:].sum() if len(area_sums) > 5 else 0
-        if others_sum > 0:
-            top5['기타'] = float(others_sum)
-        return {k: int(round(v)) for k, v in top5.items()}
-        
+    # Group '공장', '창고시설' under '기타' in use classification
     pangyo_use_stats = get_use_stats(p_b_filtered)
     cheongna_use_stats = get_use_stats(c_b_filtered)
     
@@ -400,7 +638,7 @@ def main():
     cheongna_lu_file = workspace_dir / "토지이용" / "AL_D155_28_20241204" / "AL_D155_28_20241204.csv"
     
     pangyo_dong_codes_str = {"4113510900"}
-    cheongna_dong_codes_str = {"2826010700", "2826012200", "2826010600", "2826010400", "2826011100", "2826011200", "2826011300"}
+    cheongna_dong_codes_str = {"2826010700"}
     
     pangyo_lu_raw, p_zoning = process_land_use_fast_local(pangyo_lu_file, pangyo_dong_codes_str, p_pnus_bbox)
     cheongna_lu_raw, c_zoning = process_land_use_fast_local(cheongna_lu_file, cheongna_dong_codes_str, c_pnus_bbox)
@@ -420,6 +658,8 @@ def main():
             elif any(term in zone for term in ["상업", "업무"]):
                 categories["상업지역"] += count
             elif any(term in zone for term in ["공업", "공장", "산업"]):
+                # Although factories and warehouses are mapped to Others in buildings,
+                # land use planning zones for industrial areas can still be categorized or mapped as needed.
                 categories["공업지역"] += count
             elif any(term in zone for term in ["녹지", "공원", "보전녹지", "자연녹지"]):
                 categories["녹지지역"] += count
@@ -432,7 +672,6 @@ def main():
     pangyo_lu_categories = categorize_zones(pangyo_lu_raw)
     cheongna_lu_categories = categorize_zones(cheongna_lu_raw)
     
-    # Major Industry Composition ratios (3-key + 기타)
     industry_ratio = {
         "pangyo": {
             "정보통신업": 55,
@@ -483,45 +722,27 @@ def main():
         json.dump(cleaned_comparison, f, ensure_ascii=False, indent=2)
     with open(root_comparison_output, 'w', encoding='utf-8') as f:
         json.dump(cleaned_comparison, f, ensure_ascii=False, indent=2)
-        
     print(f"[+] Saved comparison data to {comparison_output}")
     
     # -------------------------------------------------------------
-    # 8. Convert Parcel Shapefiles to GeoJSON with Zoning & Register Joined
+    # 9. Convert Parcel Shapefiles to GeoJSON with Zoning & Register Joined
     # -------------------------------------------------------------
-    print("[*] Generating GeoJSON parcels layers with strict boundary clipping...")
+    print("[*] Generating GeoJSON parcels layers...")
     p_box_clipped['zoning'] = p_box_clipped['PNU'].map(p_zoning).fillna("지정정보없음")
     c_box_clipped['zoning'] = c_box_clipped['PNU'].map(c_zoning).fillna("지정정보없음")
     
-    def build_pnu_from_register(df):
-        df = df.copy()
-        df['대지구분코드'] = df['대지구분코드'].fillna(0).astype(int)
-        df['번'] = df['번'].fillna(0).astype(int)
-        df['지'] = df['지'].fillna(0).astype(int)
-        df['시군구코드'] = df['시군구코드'].astype(str)
-        df['법정동코드_str'] = df['법정동코드'].astype(str).str.zfill(5)
-        
-        land_type = df['대지구분코드'].apply(lambda x: '2' if x == 2 else '1')
-        pnu_series = (
-            df['시군구코드'] + 
-            df['법정동코드_str'] + 
-            land_type + 
-            df['번'].astype(str).str.zfill(4) + 
-            df['지'].astype(str).str.zfill(4)
-        )
-        df['PNU'] = pnu_series
-        return df
-        
-    p_b_clean = build_pnu_from_register(p_b_filtered)
-    p_b_clean = p_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
+    # PNU-based deduplicated details
+    p_b_clean = p_b_filtered.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
+    c_b_clean = c_b_filtered.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
     
-    c_b_clean = build_pnu_from_register(c_b_filtered)
-    c_b_clean = c_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
+    # Project to 4326 for GeoJSON output
+    p_box_clipped_4326 = p_box_clipped.to_crs(epsg=4326)
+    c_box_clipped_4326 = c_box_clipped.to_crs(epsg=4326)
     
-    p_box_clipped['PNU'] = p_box_clipped['PNU'].astype(str)
-    c_box_clipped['PNU'] = c_box_clipped['PNU'].astype(str)
+    p_box_clipped_4326['PNU'] = p_box_clipped_4326['PNU'].astype(str)
+    c_box_clipped_4326['PNU'] = c_box_clipped_4326['PNU'].astype(str)
     
-    p_box_clipped = p_box_clipped.merge(
+    p_box_clipped_4326 = p_box_clipped_4326.merge(
         p_b_clean[[
             'PNU', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)', 
             '지상층수', '사용승인일', '건물명'
@@ -530,7 +751,7 @@ def main():
         how='left'
     )
     
-    c_box_clipped = c_box_clipped.merge(
+    c_box_clipped_4326 = c_box_clipped_4326.merge(
         c_b_clean[[
             'PNU', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)', 
             '지상층수', '사용승인일', '건물명'
@@ -589,8 +810,8 @@ def main():
             features.append(feature)
         return {"type": "FeatureCollection", "features": features}
 
-    p_geojson = to_geojson(p_box_clipped)
-    c_geojson = to_geojson(c_box_clipped)
+    p_geojson = to_geojson(p_box_clipped_4326)
+    c_geojson = to_geojson(c_box_clipped_4326)
     
     p_out = workspace_dir / "pangyo_parcels.geojson"
     c_out = workspace_dir / "cheongna_parcels.geojson"
@@ -612,7 +833,7 @@ def main():
     print(f"[+] Saved clipped Cheongna parcels to {c_out}")
     
     # -------------------------------------------------------------
-    # 9. Legacy Compatibility Outputs (Empty GeoJSONs)
+    # 10. Legacy Compatibility Outputs (Empty GeoJSONs)
     # -------------------------------------------------------------
     empty_geojson = {"type": "FeatureCollection", "features": []}
     p_b_out = workspace_dir / "pangyo_buildings.geojson"
@@ -627,53 +848,37 @@ def main():
         json.dump(empty_geojson, f, ensure_ascii=False)
     with open(docs_dir / "cheongna_buildings.geojson", "w", encoding="utf-8") as f:
         json.dump(empty_geojson, f, ensure_ascii=False)
-        
     print("[+] Saved legacy compatibility building layers")
-    print("[+] Preprocessing successfully completed!")
-
-def process_land_use_fast_local(file_path, target_dong_codes, target_pnus):
-    zone_counts = {}
-    zoning_dict = {}
-    if not file_path.exists():
-        print(f"  [!] Warning: Land use file {file_path} not found.")
-        return zone_counts, {}
     
-    print(f"  [*] Stream-parsing {file_path.name}...")
-    with open(file_path, 'r', encoding='cp949') as f:
-        header = f.readline()
-        cols = [c.strip('"') for c in header.split(',')]
+    # -------------------------------------------------------------
+    # 11. Integrity Verification Log & Safety Checks
+    # -------------------------------------------------------------
+    print("\n" + "="*60)
+    print("[*] INTEGRITY VERIFICATION LOG")
+    print(f"  1) Final Parcel Count: Pangyo = {len(p_box_clipped)} vs Cheongna = {len(c_box_clipped)}")
+    print(f"  2) Final Building Count in Register: Pangyo = {len(p_b_filtered)} vs Cheongna = {len(c_b_filtered)}")
+    print(f"  3) Base Region Population inside BBox/IBD: Pangyo = {pangyo_pop} vs Cheongna = {cheongna_pop}")
+    print(f"  4) 60m Deduplicated Catchment Population: Pangyo = {pangyo_60_total['population']} vs Cheongna = {cheongna_60_total['population']}")
+    print(f"  5) 60m Deduplicated Catchment Workers: Pangyo = {pangyo_60_total['workers']} vs Cheongna = {cheongna_60_total['workers']}")
+    print("="*60 + "\n")
+    
+    # Safety Checks: Stop if values are 0 or abnormally large
+    if len(p_box_clipped) == 0 or len(c_box_clipped) == 0:
+        raise ValueError("Error: Final parcel count is 0! Spatial clipping or legal dong filtering failed.")
+    if len(p_b_filtered) == 0 or len(c_b_filtered) == 0:
+        raise ValueError("Error: Final building count in register is 0! Building register filtering failed.")
+    if pangyo_pop == 0 or cheongna_pop == 0:
+        raise ValueError("Error: BBox population is 0! Demographics mapping failed.")
+    if pangyo_60_total['population'] == 0 or cheongna_60_total['population'] == 0:
+        raise ValueError("Error: Catchment population is 0! Subway accessibility calculation failed.")
         
-        idx_pnu = cols.index('고유번호') if '고유번호' in cols else 0
-        idx_dong = cols.index('법정동코드') if '법정동코드' in cols else 1
-        idx_zone = cols.index('용도지역지구명') if '용도지역지구명' in cols else 10
-        idx_code = cols.index('용도지역지구코드') if '용도지역지구코드' in cols else 9
+    # Upper bounds safety limits
+    if len(p_box_clipped) > 10000 or len(c_box_clipped) > 10000:
+        raise ValueError("Error: Final parcel count is abnormally large (>10,000)!")
+    if pangyo_pop > 100000 or cheongna_pop > 200000:
+        raise ValueError("Error: BBox population is abnormally large (>100k for Pangyo / >200k for Cheongna)!")
         
-        for line in f:
-            row = line.split(',')
-            if len(row) > max(idx_pnu, idx_dong, idx_zone, idx_code):
-                dong = row[idx_dong].strip('"')
-                if dong in target_dong_codes:
-                    zone = row[idx_zone].strip('"')
-                    pnu = row[idx_pnu].strip('"')
-                    code = row[idx_code].strip('"')
-                    if zone:
-                        zone_counts[zone] = zone_counts.get(zone, 0) + 1
-                        if code.startswith('UQA'):
-                            if pnu in target_pnus:
-                                zoning_dict.setdefault(pnu, set()).add((code, zone))
-                            
-    def get_priority_key(item):
-        c, n = item
-        is_detailed = 1 if c not in ['UQA001', 'UQA002', 'UQA003', 'UQA004', 'UQA000'] else 0
-        name_len = len(n) if n else 0
-        return (is_detailed, name_len, c)
-
-    zoning_str_dict = {}
-    for k, v in zoning_dict.items():
-        sorted_items = sorted(list(v), key=get_priority_key, reverse=True)
-        zoning_str_dict[k] = ", ".join([item[1] for item in sorted_items])
-        
-    return zone_counts, zoning_str_dict
+    print("[+] Preprocessing successfully completed without errors!")
 
 if __name__ == "__main__":
     main()
