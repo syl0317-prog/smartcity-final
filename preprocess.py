@@ -107,61 +107,43 @@ def main():
     p_b_df = pd.read_csv(pangyo_b_file, encoding='utf-8-sig')
     c_b_df = pd.read_csv(cheongna_b_file, encoding='utf-8-sig')
     
-    pangyo_dong_codes = [10800, 10900, 11000, 11500, 11600, 11700, 11800]
-    cheongna_dong_codes = [12200]
+    pangyo_dong_codes = [10900]
+    cheongna_dong_codes = [10700]
     
     p_b_filtered = p_b_df[p_b_df['법정동코드'].isin(pangyo_dong_codes)].copy()
     c_b_filtered = c_b_df[c_b_df['법정동코드'].isin(cheongna_dong_codes)].copy()
     
     def get_use_stats(df):
-        counts = df['주용도코드명'].value_counts()
-        top5 = counts.head(5).to_dict()
-        others_sum = counts.iloc[5:].sum() if len(counts) > 5 else 0
+        df = df.copy()
+        df['연면적_num'] = pd.to_numeric(df['연면적(㎡)'], errors='coerce').fillna(0)
+        area_sums = df.groupby('주용도코드명')['연면적_num'].sum().sort_values(ascending=False)
+        top5 = area_sums.head(5).to_dict()
+        others_sum = area_sums.iloc[5:].sum() if len(area_sums) > 5 else 0
         if others_sum > 0:
-            top5['기타'] = int(others_sum)
-        return {k: int(v) for k, v in top5.items()}
+            top5['기타'] = float(others_sum)
+        return {k: int(round(v)) for k, v in top5.items()}
     
     pangyo_use_stats = get_use_stats(p_b_filtered)
     cheongna_use_stats = get_use_stats(c_b_filtered)
     
     # -------------------------------------------------------------
-    # 3. Load Parcel Shapefiles & BBox Filter (to get PNUs first)
+    # 3. Load Parcel Shapefiles & Dong Filter (to get PNUs first)
     # -------------------------------------------------------------
     print("[*] Loading parcel shapefiles...")
-    p_box_coords = [127.0980, 37.3950, 127.1150, 37.4060]
-    c_box_coords = [126.6350, 37.5280, 126.6630, 37.5490]
     
-    # Pangyo Parcels
+    # Pangyo Parcels (Only 삼평동 - 4113510900)
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
     p_gdf = gpd.read_file(p_shp)
-    pangyo_dong_prefixes = ('4113510800', '4113510900', '4113511000', '4113511500', '4113511600', '4113511700', '4113511800')
+    pangyo_dong_prefixes = ('4113510900',)
     p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith(pangyo_dong_prefixes)].copy()
     p_box = p_box.to_crs(epsg=4326)
-    p_box = p_box.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
-    # Filter by centroid to strictly keep parcels inside the bbox
-    p_centroids = p_box.geometry.centroid
-    p_box = p_box[
-        (p_centroids.x >= p_box_coords[0]) & 
-        (p_centroids.x <= p_box_coords[2]) & 
-        (p_centroids.y >= p_box_coords[1]) & 
-        (p_centroids.y <= p_box_coords[3])
-    ].copy()
     
-    # Cheongna Parcels
+    # Cheongna Parcels (Only 청라동 - 2826010700)
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
     c_gdf = gpd.read_file(c_shp)
-    cheongna_dong_prefixes = ('2826012200',)
+    cheongna_dong_prefixes = ('2826010700',)
     c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith(cheongna_dong_prefixes)].copy()
     c_box = c_box.to_crs(epsg=4326)
-    c_box = c_box.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
-    # Filter by centroid to strictly keep parcels inside the bbox
-    c_centroids = c_box.geometry.centroid
-    c_box = c_box[
-        (c_centroids.x >= c_box_coords[0]) & 
-        (c_centroids.x <= c_box_coords[2]) & 
-        (c_centroids.y >= c_box_coords[1]) & 
-        (c_centroids.y <= c_box_coords[3])
-    ].copy()
     
     p_pnus = set(p_box['PNU'].dropna().unique())
     c_pnus = set(c_box['PNU'].dropna().unique())
@@ -173,8 +155,8 @@ def main():
     pangyo_lu_file = workspace_dir / "토지이용" / "AL_D155_41_20241204" / "AL_D155_41_20241204.csv"
     cheongna_lu_file = workspace_dir / "토지이용" / "AL_D155_28_20241204" / "AL_D155_28_20241204.csv"
     
-    pangyo_dong_codes_str = {"4113510800", "4113510900", "4113511000", "4113511500", "4113511600", "4113511700", "4113511800"}
-    cheongna_dong_codes_str = {"2826012200"}
+    pangyo_dong_codes_str = {"4113510900"}
+    cheongna_dong_codes_str = {"2826010700"}
     
     pangyo_lu_raw, p_zoning = process_land_use_fast(pangyo_lu_file, pangyo_dong_codes_str, p_pnus)
     cheongna_lu_raw, c_zoning = process_land_use_fast(cheongna_lu_file, cheongna_dong_codes_str, c_pnus)

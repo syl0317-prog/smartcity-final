@@ -761,7 +761,7 @@
       
       <!-- Chart Card 1: Building Use Grouped Bar -->
       <div class="chart-card">
-        <h3>🏢 주요 건축물 주용도 분포 비교 (3-2)</h3>
+        <h3>🏢 주요 건축물 주용도 분포 비교 (연면적 합계 기준)</h3>
         <div class="chart-wrapper">
           <canvas id="use-chart"></canvas>
         </div>
@@ -1344,7 +1344,7 @@
             tooltip: {
               callbacks: {
                 label: function(context) {
-                  return context.dataset.label + ': ' + context.raw.toLocaleString() + '동';
+                  return context.dataset.label + ': ' + context.raw.toLocaleString() + '㎡';
                 }
               }
             }
