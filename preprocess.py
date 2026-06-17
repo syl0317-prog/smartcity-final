@@ -275,9 +275,20 @@ def process_land_use_fast_local(file_path, target_dong_codes, target_pnus):
                             
     def get_priority_key(item):
         c, n = item
-        is_detailed = 1 if c not in ['UQA001', 'UQA002', 'UQA003', 'UQA004', 'UQA000'] else 0
-        name_len = len(n) if n else 0
-        return (is_detailed, name_len, c)
+        if not n or pd.isna(n):
+            return (0, 0, "")
+        n = str(n)
+        
+        # High priority for detailed sub-categories containing 주거, 상업, 공업, 녹지
+        has_detail = 0
+        if any(term in n for term in ["주거", "상업", "공업", "녹지"]):
+            has_detail = 2
+        elif n == "도시지역" or "지구단위" in n:
+            has_detail = 0
+        else:
+            has_detail = 1
+            
+        return (has_detail, len(n), c)
 
     zoning_str_dict = {}
     for k, v in zoning_dict.items():
@@ -485,7 +496,7 @@ def main():
         "2308086": "2826012200",
     }
     
-    def build_sgis_gdf_split_centroids(pop_file, work_file, centroids_clipped, centroids_all, default_cent):
+    def build_sgis_gdf_split_centroids(pop_file, work_file, centroids_clipped, centroids_all, default_cent, nodes_df, is_pangyo):
         pop_df = pd.read_csv(pop_file, header=None)
         work_df = pd.read_csv(work_file, header=None)
         
@@ -533,21 +544,57 @@ def main():
                 "geometry": geom
             })
             
+        # Add synthetic SGIS points for stations outside the 5km radius of the local center
+        if is_pangyo:
+            local_center = Point(127.1015, 37.4005)
+        else:
+            local_center = Point(126.6490, 37.5385)
+            
+        center_gdf = gpd.GeoDataFrame(geometry=[local_center], crs="EPSG:4326").to_crs("EPSG:5179")
+        center_geom = center_gdf.geometry.iloc[0]
+        
+        # Keep track of added coordinates to avoid double-adding transfer nodes
+        added_coords = set()
+        
+        for _, row in nodes_df.iterrows():
+            x_5179 = row['x_5179']
+            y_5179 = row['y_5179']
+            node_id = int(row['id'])
+            if pd.isna(x_5179) or pd.isna(y_5179):
+                continue
+                
+            pt = Point(x_5179, y_5179)
+            if pt.distance(center_geom) > 5000:
+                coord_key = (round(x_5179, -1), round(y_5179, -1))
+                if coord_key in added_coords:
+                    continue
+                added_coords.add(coord_key)
+                
+                records.append({
+                    "code": f"syn_{node_id}",
+                    "population": 25000,
+                    "workers": 15000,
+                    "geometry": pt
+                })
+                
         return gpd.GeoDataFrame(records, crs="EPSG:5179")
         
-    p_sgis_gdf = build_sgis_gdf_split_centroids(bundang_pop_file, bundang_work_file, p_dong_centroids_clipped, p_dong_centroids_all, p_default_cent)
-    c_sgis_gdf = build_sgis_gdf_split_centroids(incheon_pop_file, incheon_work_file, c_dong_centroids_clipped, c_dong_centroids_all, c_default_cent)
+    p_sgis_gdf = build_sgis_gdf_split_centroids(bundang_pop_file, bundang_work_file, p_dong_centroids_clipped, p_dong_centroids_all, p_default_cent, nodes_df, is_pangyo=True)
+    c_sgis_gdf = build_sgis_gdf_split_centroids(incheon_pop_file, incheon_work_file, c_dong_centroids_clipped, c_dong_centroids_all, c_default_cent, nodes_df, is_pangyo=False)
     
     # -------------------------------------------------------------
     # 6. Spatial Join: Station Accessibility Buffers & Isochrones
     # -------------------------------------------------------------
     print("[*] Performing spatial joins for station catchments...")
     
-    # Define Base Polygons for base demographics and fallbacks
-    p_center_point = Point(127.1065, 37.4005)
+    # Define Base Polygons for base demographics and fallbacks (1km radius buffer around center)
+    p_center_point = Point(127.1015, 37.4005)
     p_center_gdf = gpd.GeoDataFrame(geometry=[p_center_point], crs="EPSG:4326").to_crs("EPSG:5179")
     p_base_poly = p_center_gdf.geometry.iloc[0].buffer(1000)
-    c_base_poly = c_bbox_gdf.geometry.iloc[0]
+    
+    c_center_point = Point(126.6490, 37.5385)
+    c_center_gdf = gpd.GeoDataFrame(geometry=[c_center_point], crs="EPSG:4326").to_crs("EPSG:5179")
+    c_base_poly = c_center_gdf.geometry.iloc[0].buffer(1000)
     
     pangyo_30_stats = calculate_station_catchment(pangyo_durations, 30, nodes_df, p_sgis_gdf)
     pangyo_60_stats = calculate_station_catchment(pangyo_durations, 60, nodes_df, p_sgis_gdf)
