@@ -21709,12 +21709,12 @@
         "jibun": "산3-1임",
         "zoning": "가축사육제한구역, 개발제한구역, 경제자유구역, 공익용산지, 과밀억제권역, 근린공원, 성장관리권역, 자연녹지지역, 지구단위계획구역",
         "name": "대지",
-        "use": "위험물저장및처리시설",
-        "area": 50.64,
-        "far": 0.0,
-        "lot_area": 0.0,
-        "bc_ratio": 0.0,
-        "floors_up": 1,
+        "use": "정보없음",
+        "area": null,
+        "far": null,
+        "lot_area": null,
+        "bc_ratio": null,
+        "floors_up": 0,
         "approved_year": "정보없음"
       }
     },

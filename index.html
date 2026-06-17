@@ -1189,11 +1189,10 @@
       layers.pangyo.parcels = L.geoJSON(pangyoParcelsData, {
         style: function(feature) {
           return {
-            fillColor: '#475569',
-            fillOpacity: 0.05,
-            color: '#475569',
-            weight: 1,
-            dashArray: '3, 3'
+            fillColor: getUseColor(feature.properties.use),
+            fillOpacity: 0.7,
+            color: '#0b0f19',
+            weight: 0.5
           };
         },
         onEachFeature: function(feature, layer) {
@@ -1205,32 +1204,18 @@
       layers.cheongna.parcels = L.geoJSON(cheongnaParcelsData, {
         style: function(feature) {
           return {
-            fillColor: '#475569',
-            fillOpacity: 0.05,
-            color: '#475569',
-            weight: 1,
-            dashArray: '3, 3'
+            fillColor: getUseColor(feature.properties.use),
+            fillOpacity: 0.7,
+            color: '#0b0f19',
+            weight: 0.5
           };
         },
         onEachFeature: function(feature, layer) {
           layer.bindPopup(createParcelPopupHtml(feature.properties));
-          layer.on({
-            mouseover: function(e) {
-              const ly = e.target;
-              ly.setStyle({
-                fillOpacity: 0.25,
-                weight: 1.5,
-                color: '#f472b6'
-              });
-            },
-            mouseout: function(e) {
-              layers.cheongna.parcels.resetStyle(e.target);
-            }
-          });
         }
       }).addTo(maps.cheongna);
       
-      // Bring parcels to back so buildings sit on top
+      // Bring parcels to back so buildings/stations sit on top
       layers.pangyo.parcels.bringToBack();
       layers.cheongna.parcels.bringToBack();
     }

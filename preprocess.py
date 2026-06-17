@@ -18,6 +18,44 @@ def clean_nan(obj):
         return None
     return obj
 
+def process_land_use_fast(file_path, target_dong_codes, target_pnus):
+    """
+    Reads a large land use CSV file line by line in CP949 encoding.
+    Returns:
+      zone_counts: dict of {zone_name: count} for target_dong_codes
+      zoning_dict: dict of {pnu: zoning_str} for target_pnus
+    """
+    zone_counts = {}
+    zoning_dict = {}
+    if not file_path.exists():
+        print(f"  [!] Warning: Land use file {file_path} not found.")
+        return zone_counts, zoning_dict
+    
+    print(f"  [*] Stream-parsing {file_path.name}...")
+    with open(file_path, 'r', encoding='cp949') as f:
+        header = f.readline()
+        cols = [c.strip('"') for c in header.split(',')]
+        
+        # We need: '고유번호' (pnu), '법정동코드' (dong), '용도지역지구명' (zone)
+        idx_pnu = cols.index('고유번호') if '고유번호' in cols else 0
+        idx_dong = cols.index('법정동코드') if '법정동코드' in cols else 1
+        idx_zone = cols.index('용도지역지구명') if '용도지역지구명' in cols else 10
+        
+        for line in f:
+            row = line.split(',')
+            if len(row) > max(idx_pnu, idx_dong, idx_zone):
+                dong = row[idx_dong].strip('"')
+                if dong in target_dong_codes:
+                    zone = row[idx_zone].strip('"')
+                    pnu = row[idx_pnu].strip('"')
+                    if zone:
+                        zone_counts[zone] = zone_counts.get(zone, 0) + 1
+                        if pnu in target_pnus:
+                            zoning_dict.setdefault(pnu, set()).add(zone)
+                            
+    zoning_str_dict = {k: ", ".join(sorted(list(v))) for k, v in zoning_dict.items()}
+    return zone_counts, zoning_str_dict
+
 def main():
     print("[*] Preprocessing started...")
     
@@ -31,7 +69,6 @@ def main():
     # -------------------------------------------------------------
     print("[*] Copying original subway_isochrone.json to docs/...")
     original_isochrone_path = workspace_dir / "subway_isochrone.json"
-    
     if not original_isochrone_path.exists():
         original_isochrone_path = workspace_dir / "subway_network" / "network" / "subway_isochrone.json"
         
@@ -75,31 +112,43 @@ def main():
     cheongna_use_stats = get_use_stats(c_b_filtered)
     
     # -------------------------------------------------------------
-    # 3. Land Use Analysis
+    # 3. Load Parcel Shapefiles & BBox Filter (to get PNUs first)
     # -------------------------------------------------------------
-    print("[*] Processing land use CSV files (in chunks)...")
+    print("[*] Loading parcel shapefiles...")
+    p_box_coords = [127.0980, 37.3950, 127.1200, 37.4060]
+    c_box_coords = [126.6350, 37.5330, 126.6630, 37.5490]
+    
+    # Pangyo Parcels
+    p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
+    p_gdf = gpd.read_file(p_shp)
+    pangyo_dong_prefixes = ('4113510800', '4113510900', '4113511000', '4113511500', '4113511600', '4113511700', '4113511800')
+    p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith(pangyo_dong_prefixes)].copy()
+    p_box = p_box.to_crs(epsg=4326)
+    p_box = p_box.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
+    
+    # Cheongna Parcels
+    c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
+    c_gdf = gpd.read_file(c_shp)
+    cheongna_dong_prefixes = ('2826012200',)
+    c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith(cheongna_dong_prefixes)].copy()
+    c_box = c_box.to_crs(epsg=4326)
+    c_box = c_box.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
+    
+    p_pnus = set(p_box['PNU'].dropna().unique())
+    c_pnus = set(c_box['PNU'].dropna().unique())
+    
+    # -------------------------------------------------------------
+    # 4. Land Use Analysis + Zoning Matching (Fast Stream Parse)
+    # -------------------------------------------------------------
+    print("[*] Processing land use and zoning (fast stream)...")
     pangyo_lu_file = workspace_dir / "토지이용" / "AL_D155_41_20241204" / "AL_D155_41_20241204.csv"
     cheongna_lu_file = workspace_dir / "토지이용" / "AL_D155_28_20241204" / "AL_D155_28_20241204.csv"
     
-    pangyo_lu_codes = [4113510800, 4113510900, 4113511000, 4113511500, 4113511600, 4113511700, 4113511800]
-    cheongna_lu_codes = [2826012200]
+    pangyo_dong_codes_str = {"4113510800", "4113510900", "4113511000", "4113511500", "4113511600", "4113511700", "4113511800"}
+    cheongna_dong_codes_str = {"2826012200"}
     
-    def process_land_use_zones(file_path, target_codes):
-        zone_counts = {}
-        if not file_path.exists():
-            print(f"  [!] Warning: Land use file {file_path} not found.")
-            return zone_counts
-            
-        for chunk in pd.read_csv(file_path, usecols=['법정동코드', '용도지역지구명'], chunksize=500000, encoding='cp949'):
-            filtered = chunk[chunk['법정동코드'].isin(target_codes)]
-            if len(filtered) > 0:
-                counts = filtered['용도지역지구명'].value_counts()
-                for zone, count in counts.items():
-                    zone_counts[zone] = zone_counts.get(zone, 0) + int(count)
-        return zone_counts
-
-    pangyo_lu_raw = process_land_use_zones(pangyo_lu_file, pangyo_lu_codes)
-    cheongna_lu_raw = process_land_use_zones(cheongna_lu_file, cheongna_lu_codes)
+    pangyo_lu_raw, p_zoning = process_land_use_fast(pangyo_lu_file, pangyo_dong_codes_str, p_pnus)
+    cheongna_lu_raw, c_zoning = process_land_use_fast(cheongna_lu_file, cheongna_dong_codes_str, c_pnus)
     
     def categorize_zones(zone_counts):
         categories = {
@@ -129,7 +178,7 @@ def main():
     cheongna_lu_categories = categorize_zones(cheongna_lu_raw)
     
     # -------------------------------------------------------------
-    # 4. SGIS Demographics
+    # 5. SGIS Demographics
     # -------------------------------------------------------------
     print("[*] Processing SGIS demographics...")
     incheon_pop_file = workspace_dir / "SGIS" / "23080_2024년_인구총괄(총인구).csv"
@@ -157,9 +206,7 @@ def main():
     pangyo_ratio = round(pangyo_workers / pangyo_pop, 3) if pangyo_pop > 0 else 0
     cheongna_ratio = round(cheongna_workers / cheongna_pop, 3) if cheongna_pop > 0 else 0
     
-    # -------------------------------------------------------------
-    # 5. Save Combined Comparison Data JSON
-    # -------------------------------------------------------------
+    # Save Combined Comparison Data JSON
     comparison_data = {
         "demographics": {
             "pangyo": {
@@ -195,60 +242,12 @@ def main():
     print(f"[+] Saved comparison data to {comparison_output} and root")
     
     # -------------------------------------------------------------
-    # 6. Parcel Data Processing (SHP -> GeoJSON with Zoning & Register Joined)
+    # 6. Convert Parcel Shapefiles to GeoJSON with Zoning & Register Joined
     # -------------------------------------------------------------
-    print("[*] Processing parcel data...")
-    p_box_coords = [127.0980, 37.3950, 127.1200, 37.4060]
-    c_box_coords = [126.6350, 37.5330, 126.6630, 37.5490]
-    
-    # Pangyo Parcels (Filter by Dong Code 4113510900 - 삼평동 & cx)
-    p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
-    p_gdf = gpd.read_file(p_shp).to_crs(epsg=4326)
-    p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith('4113510900')].copy()
-    p_box = p_box.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
-    
-    # Cheongna Parcels (Filter by Dong Code 2826012200 - 청라동 & cx)
-    c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
-    c_gdf = gpd.read_file(c_shp).to_crs(epsg=4326)
-    c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith('2826012200')].copy()
-    c_box = c_box.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
-    
-    p_pnus = set(p_box['PNU'].dropna().unique())
-    c_pnus = set(c_box['PNU'].dropna().unique())
-    
-    # Match Zoning from CSV
-    print("    Reading Gyeonggi land use CSV in chunks...")
-    p_zoning_dict = {}
-    if pangyo_lu_file.exists():
-        for chunk in pd.read_csv(pangyo_lu_file, usecols=['고유번호', '용도지역지구명'], dtype={'고유번호': str}, chunksize=500000, encoding='cp949'):
-            matched = chunk[chunk['고유번호'].isin(p_pnus)]
-            if len(matched) > 0:
-                for idx, row in matched.iterrows():
-                    pnu = row['고유번호']
-                    zone = row['용도지역지구명']
-                    if pd.notna(zone):
-                        p_zoning_dict.setdefault(pnu, set()).add(zone)
-                        
-    p_zoning = {k: ", ".join(sorted(list(v))) for k, v in p_zoning_dict.items()}
-    
-    print("    Reading Incheon land use CSV in chunks...")
-    c_zoning_dict = {}
-    if cheongna_lu_file.exists():
-        for chunk in pd.read_csv(cheongna_lu_file, usecols=['고유번호', '용도지역지구명'], dtype={'고유번호': str}, chunksize=500000, encoding='cp949'):
-            matched = chunk[chunk['고유번호'].isin(c_pnus)]
-            if len(matched) > 0:
-                for idx, row in matched.iterrows():
-                    pnu = row['고유번호']
-                    zone = row['용도지역지구명']
-                    if pd.notna(zone):
-                        c_zoning_dict.setdefault(pnu, set()).add(zone)
-                        
-    c_zoning = {k: ", ".join(sorted(list(v))) for k, v in c_zoning_dict.items()}
-    
+    print("[*] Merging building register details to parcels...")
     p_box['zoning'] = p_box['PNU'].map(p_zoning).fillna("지정정보없음")
     c_box['zoning'] = c_box['PNU'].map(c_zoning).fillna("지정정보없음")
     
-    # Clean building register datasets for merging
     def build_pnu_from_register(df):
         df = df.copy()
         df['대지구분코드'] = df['대지구분코드'].fillna(0).astype(int)
@@ -257,10 +256,12 @@ def main():
         df['시군구코드'] = df['시군구코드'].astype(str)
         df['법정동코드_str'] = df['법정동코드'].astype(str).str.zfill(5)
         
+        land_type = df['대지구분코드'].apply(lambda x: '2' if x == 2 else '1')
+        
         pnu_series = (
             df['시군구코드'] + 
             df['법정동코드_str'] + 
-            (df['대지구분코드'] + 1).astype(str) + 
+            land_type + 
             df['번'].astype(str).str.zfill(4) + 
             df['지'].astype(str).str.zfill(4)
         )
@@ -273,7 +274,9 @@ def main():
     c_b_clean = build_pnu_from_register(c_b_filtered)
     c_b_clean = c_b_clean.sort_values(by='연면적(㎡)', ascending=False).drop_duplicates(subset=['PNU'])
     
-    # Merge Register info to Parcels (so parcel clicks show register info too)
+    p_box['PNU'] = p_box['PNU'].astype(str)
+    c_box['PNU'] = c_box['PNU'].astype(str)
+    
     p_box = p_box.merge(
         p_b_clean[[
             'PNU', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)', 
@@ -346,7 +349,6 @@ def main():
     p_geojson = to_geojson(p_box)
     c_geojson = to_geojson(c_box)
     
-    # Save outputs to both root and docs
     p_out = workspace_dir / "pangyo_parcels.geojson"
     c_out = workspace_dir / "cheongna_parcels.geojson"
     
@@ -367,163 +369,25 @@ def main():
     print(f"[+] Saved Cheongna parcels to {c_out} and docs/")
     
     # -------------------------------------------------------------
-    # 7. Building Data Processing (SHP -> GeoJSON with Register Joined)
+    # 7. Building Data Processing (Deprecated - Outputting Empty GeoJSONs)
     # -------------------------------------------------------------
-    print("[*] Processing building spatial data...")
-    p_build_shp = workspace_dir / "도로망" / "cheongna_roads.zip" / "planet_127.092,37.346_127.153,37.439-shp" / "shape" / "buildings.shp"
-    c_build_shp = workspace_dir / "도로망" / "pangyo_roads.zip" / "planet_126.604,37.473_126.673,37.578-shp" / "shape" / "buildings.shp"
+    print("[*] Outputting empty building geojson layers to maintain legacy compatibility...")
+    empty_geojson = {"type": "FeatureCollection", "features": []}
     
-    p_build_gdf = gpd.read_file(p_build_shp).to_crs(epsg=4326)
-    c_build_gdf = gpd.read_file(c_build_shp).to_crs(epsg=4326)
-    # Filter directly by Bounding Box coords
-    print("    Filtering OSM buildings by official bbox...")
-    p_build_box = p_build_gdf.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
-    c_build_box = c_build_gdf.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
-    
-    # Spatial join with parcels (how='left' to keep 100% of buildings in bbox)
-    print("    Joining filtered buildings with parcel PNUs...")
-    p_build_centroids = p_build_box.copy()
-    p_build_centroids['geometry'] = p_build_box.centroid
-    p_joined = gpd.sjoin(p_build_centroids, p_box[['PNU', 'geometry']], how='left', predicate='within')
-    # Resolve duplicated indices from sjoin if any
-    p_joined = p_joined[~p_joined.index.duplicated(keep='first')]
-    p_build_box['PNU'] = p_joined['PNU']
-    
-    c_build_centroids = c_build_box.copy()
-    c_build_centroids['geometry'] = c_build_box.centroid
-    c_joined = gpd.sjoin(c_build_centroids, c_box[['PNU', 'geometry']], how='left', predicate='within')
-    c_joined = c_joined[~c_joined.index.duplicated(keep='first')]
-    c_build_box['PNU'] = c_joined['PNU']
-    
-    print(f"    Pangyo (Sampyeong-dong bbox) buildings found: {len(p_build_box)}")
-    print(f"    Cheongna (Cheongna-dong bbox) buildings found: {len(c_build_box)}")
-    
-    p_merged = p_build_box.merge(
-        p_b_clean[[
-            'PNU', '건물명', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)',
-            '지상층수', '지하층수', '사용승인일', '대지위치'
-        ]], 
-        on='PNU', 
-        how='left'
-    )
-    
-    c_merged = c_build_box.merge(
-        c_b_clean[[
-            'PNU', '건물명', '주용도코드명', '연면적(㎡)', '용적률(%)', '대지면적(㎡)', '건폐율(%)',
-            '지상층수', '지하층수', '사용승인일', '대지위치'
-        ]], 
-        on='PNU', 
-        how='left'
-    )
-    
-    def process_merged_buildings(df):
-        features = []
-        for idx, row in df.iterrows():
-            geom = row['geometry']
-            if geom is None:
-                continue
-                
-            name = row['건물명']
-            if pd.isna(name) or name == "":
-                name = row['name']
-            if pd.isna(name) or name == "":
-                name = "일반건물"
-                
-            use = row['주용도코드명']
-            if pd.isna(use) or use == "":
-                osm_t = str(row['type']).lower()
-                if 'apartments' in osm_t or 'residential' in osm_t:
-                    use = '공동주택'
-                elif 'house' in osm_t or 'detached' in osm_t:
-                    use = '단독주택'
-                elif 'office' in osm_t:
-                    use = '업무시설'
-                elif 'retail' in osm_t or 'commercial' in osm_t:
-                    use = '판매시설'
-                elif 'school' in osm_t or 'university' in osm_t:
-                    use = '교육연구시설'
-                elif 'factory' in osm_t or 'industrial' in osm_t:
-                    use = '공장'
-                else:
-                    use = '기타 용도'
-            
-            area = row['연면적(㎡)']
-            area = float(area) if pd.notna(area) else None
-            
-            far = row['용적률(%)']
-            far = float(far) if pd.notna(far) else None
-            
-            lot_area = row['대지면적(㎡)']
-            lot_area = float(lot_area) if pd.notna(lot_area) else None
-            
-            bc_ratio = row['건폐율(%)']
-            bc_ratio = float(bc_ratio) if pd.notna(bc_ratio) else None
-            
-            fl_up = row['지상층수']
-            fl_up = int(fl_up) if pd.notna(fl_up) else 0
-            fl_down = row['지하층수']
-            fl_down = int(fl_down) if pd.notna(fl_down) else 0
-            
-            app_y = row['사용승인일']
-            if pd.notna(app_y):
-                try:
-                    app_y_str = str(int(float(app_y)))
-                    if len(app_y_str) >= 4:
-                        app_y_str = app_y_str[:4]
-                    else:
-                        app_y_str = "정보없음"
-                except Exception:
-                    app_y_str = "정보없음"
-            else:
-                app_y_str = "정보없음"
-                
-            addr = row['대지위치']
-            if pd.isna(addr) or addr == "":
-                addr = "정보없음"
-                
-            feature = {
-                "type": "Feature",
-                "geometry": json.loads(gpd.GeoSeries([geom]).to_json())['features'][0]['geometry'],
-                "properties": {
-                    "osm_id": int(row['osm_id']) if pd.notna(row['osm_id']) else None,
-                    "osm_type": row['type'] if pd.notna(row['type']) else None,
-                    "name": name,
-                    "use": use,
-                    "area": area,
-                    "far": far,
-                    "lot_area": lot_area,
-                    "bc_ratio": bc_ratio,
-                    "floors_up": fl_up,
-                    "floors_down": fl_down,
-                    "approved_year": app_y_str,
-                    "address": addr
-                }
-            }
-            features.append(feature)
-        return {"type": "FeatureCollection", "features": features}
-
-    p_build_geojson = process_merged_buildings(p_merged)
-    c_build_geojson = process_merged_buildings(c_merged)
-    
-    # Save outputs to both root and docs
     p_b_out = workspace_dir / "pangyo_buildings.geojson"
     c_b_out = workspace_dir / "cheongna_buildings.geojson"
     
-    cleaned_p_b_geojson = clean_nan(p_build_geojson)
-    cleaned_c_b_geojson = clean_nan(c_build_geojson)
-    
     with open(p_b_out, "w", encoding="utf-8") as f:
-        json.dump(cleaned_p_b_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(empty_geojson, f, ensure_ascii=False)
     with open(c_b_out, "w", encoding="utf-8") as f:
-        json.dump(cleaned_c_b_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(empty_geojson, f, ensure_ascii=False)
         
     with open(docs_dir / "pangyo_buildings.geojson", "w", encoding="utf-8") as f:
-        json.dump(cleaned_p_b_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(empty_geojson, f, ensure_ascii=False)
     with open(docs_dir / "cheongna_buildings.geojson", "w", encoding="utf-8") as f:
-        json.dump(cleaned_c_b_geojson, f, ensure_ascii=False, indent=2)
+        json.dump(empty_geojson, f, ensure_ascii=False)
         
-    print(f"[+] Saved Pangyo buildings to {p_b_out} and docs/")
-    print(f"[+] Saved Cheongna buildings to {c_b_out} and docs/")
+    print("[+] Saved empty building geojsons to docs/ and root")
     print("[+] Preprocessing successfully completed!")
 
 if __name__ == "__main__":
