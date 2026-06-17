@@ -156,9 +156,9 @@ def main():
     p_box = p_box.to_crs(epsg=4326)
     c_box = c_box.to_crs(epsg=4326)
     
-    # Strict Clipping using gpd.clip
-    p_box_clipped = gpd.clip(p_box, p_bbox_poly).copy()
-    c_box_clipped = gpd.clip(c_box, c_bbox_poly).copy()
+    # Keep whole polygons intersecting with the BBox (no cutting of polygons)
+    p_box_clipped = p_box[p_box.geometry.intersects(p_bbox_poly)].copy()
+    c_box_clipped = c_box[c_box.geometry.intersects(c_bbox_poly)].copy()
     
     # Centroids list for Dong mapping
     p_centroids_5179 = p_gdf.to_crs(epsg=5179).copy()
