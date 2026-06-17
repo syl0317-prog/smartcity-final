@@ -1151,29 +1151,33 @@
 
     // Popup builder for parcel features
     function createParcelPopupHtml(props) {
+      const firstZoning = props.zoning ? props.zoning.split(',')[0].trim() : '정보 없음';
       return `
         <div class="popup-content" style="min-width: 220px; font-family: 'Inter', sans-serif;">
           <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: #a3e635; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">
-            🌱 필지 정보 (${props.jibun || '-'})
+            🌱 필지 정보
           </h4>
           <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.8rem;">
+            <span style="color: #94a3b8;">지번:</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.jibun || '-'}</span>
+
             <span style="color: #94a3b8;">용도지역:</span>
-            <span style="font-weight: 600; color: #f8fafc; word-break: keep-all; line-height: 1.3;">${props.zoning || '정보 없음'}</span>
+            <span style="font-weight: 600; color: #f8fafc; word-break: keep-all; line-height: 1.3;">${firstZoning}</span>
 
             <span style="color: #94a3b8;">주용도:</span>
-            <span style="font-weight: 600; color: #f8fafc;">${props.use || '정보없음'}</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.use || '정보 없음'}</span>
             
             <span style="color: #94a3b8;">연면적:</span>
-            <span style="font-weight: 600; color: #f8fafc;">${props.area ? props.area.toLocaleString() + ' ㎡' : '-'}</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.area ? props.area.toLocaleString() + ' ㎡' : '정보 없음'}</span>
             
             <span style="color: #94a3b8;">용적률:</span>
-            <span style="font-weight: 600; color: #f8fafc;">${props.far ? props.far.toFixed(2) + ' %' : '-'}</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.far ? props.far.toFixed(2) + ' %' : '정보 없음'}</span>
             
             <span style="color: #94a3b8;">대지면적:</span>
-            <span style="font-weight: 600; color: #f8fafc;">${props.lot_area ? props.lot_area.toLocaleString() + ' ㎡' : '-'}</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.lot_area ? props.lot_area.toLocaleString() + ' ㎡' : '정보 없음'}</span>
             
             <span style="color: #94a3b8;">건폐율:</span>
-            <span style="font-weight: 600; color: #f8fafc;">${props.bc_ratio ? props.bc_ratio.toFixed(2) + ' %' : '-'}</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.bc_ratio ? props.bc_ratio.toFixed(2) + ' %' : '정보 없음'}</span>
             
             <span style="color: #94a3b8;">사용승인:</span>
             <span style="font-weight: 600; color: #f8fafc;">${props.approved_year || '-'}</span>
