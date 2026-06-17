@@ -805,7 +805,7 @@
     let cheongnaParcelsData = null;
     
     // Centers & Zooms
-    const pangyoCenter = [37.4019, 127.1089];
+    const pangyoCenter = [37.4005, 127.1090];
     const cheongnaCenter = [37.5270, 126.6450];
     const pangyoZoom = 15;
     const cheongnaZoom = 14;
@@ -1098,16 +1098,18 @@
         color: '#ffffff',
         fillColor: '#38bdf8',
         fillOpacity: 0.02,
-        weight: 2.5
-      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3950, 127.0980 ~ 37.4060, 127.1200");
+        weight: 2.5,
+        interactive: false
+      }).addTo(maps.pangyo);
 
       // 2. Cheongna Target Rectangle
       L.rectangle([[37.5150, 126.6300], [37.5390, 126.6600]], {
         color: '#ffffff',
         fillColor: '#f472b6',
         fillOpacity: 0.02,
-        weight: 2.5
-      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역 경계</b><br>범위: 37.5150, 126.6300 ~ 37.5390, 126.6600");
+        weight: 2.5,
+        interactive: false
+      }).addTo(maps.cheongna);
     }
 
     // Draw Building Footprint layers with styles & popups

@@ -125,6 +125,14 @@ def main():
     p_box = p_gdf[p_gdf['PNU'].astype(str).str.startswith(pangyo_dong_prefixes)].copy()
     p_box = p_box.to_crs(epsg=4326)
     p_box = p_box.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
+    # Filter by centroid to strictly keep parcels inside the bbox
+    p_centroids = p_box.geometry.centroid
+    p_box = p_box[
+        (p_centroids.x >= p_box_coords[0]) & 
+        (p_centroids.x <= p_box_coords[2]) & 
+        (p_centroids.y >= p_box_coords[1]) & 
+        (p_centroids.y <= p_box_coords[3])
+    ].copy()
     
     # Cheongna Parcels
     c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
@@ -133,6 +141,14 @@ def main():
     c_box = c_gdf[c_gdf['PNU'].astype(str).str.startswith(cheongna_dong_prefixes)].copy()
     c_box = c_box.to_crs(epsg=4326)
     c_box = c_box.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
+    # Filter by centroid to strictly keep parcels inside the bbox
+    c_centroids = c_box.geometry.centroid
+    c_box = c_box[
+        (c_centroids.x >= c_box_coords[0]) & 
+        (c_centroids.x <= c_box_coords[2]) & 
+        (c_centroids.y >= c_box_coords[1]) & 
+        (c_centroids.y <= c_box_coords[3])
+    ].copy()
     
     p_pnus = set(p_box['PNU'].dropna().unique())
     c_pnus = set(c_box['PNU'].dropna().unique())
