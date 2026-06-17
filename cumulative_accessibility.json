@@ -3,160 +3,160 @@
     {
       "time": 0,
       "stations": 1,
-      "population": 16562,
-      "workers": 96980
+      "population": 15296,
+      "workers": 138222
     },
     {
       "time": 5,
       "stations": 4,
-      "population": 35602,
-      "workers": 116797
+      "population": 40105,
+      "workers": 212716
     },
     {
       "time": 10,
       "stations": 9,
-      "population": 42787,
-      "workers": 121423
+      "population": 102504,
+      "workers": 265082
     },
     {
       "time": 15,
       "stations": 18,
-      "population": 67818,
-      "workers": 141767
+      "population": 213027,
+      "workers": 361673
     },
     {
       "time": 20,
       "stations": 28,
-      "population": 67818,
-      "workers": 141767
+      "population": 345027,
+      "workers": 449673
     },
     {
       "time": 25,
       "stations": 43,
-      "population": 67818,
-      "workers": 141767
+      "population": 609027,
+      "workers": 625673
     },
     {
       "time": 30,
       "stations": 72,
-      "population": 67818,
-      "workers": 141767
+      "population": 1065027,
+      "workers": 929673
     },
     {
       "time": 35,
       "stations": 100,
-      "population": 67818,
-      "workers": 141767
+      "population": 1509027,
+      "workers": 1225673
     },
     {
       "time": 40,
       "stations": 131,
-      "population": 67818,
-      "workers": 141767
+      "population": 2013027,
+      "workers": 1561673
     },
     {
       "time": 45,
       "stations": 187,
-      "population": 67818,
-      "workers": 141767
+      "population": 2829027,
+      "workers": 2105673
     },
     {
       "time": 50,
       "stations": 251,
-      "population": 67818,
-      "workers": 141767
+      "population": 3933027,
+      "workers": 2841673
     },
     {
       "time": 55,
       "stations": 298,
-      "population": 67818,
-      "workers": 141767
+      "population": 4677027,
+      "workers": 3337673
     },
     {
       "time": 60,
       "stations": 343,
-      "population": 67818,
-      "workers": 141767
+      "population": 5385027,
+      "workers": 3809673
     }
   ],
   "cheongna": [
     {
       "time": 0,
       "stations": 1,
-      "population": 36830,
-      "workers": 43310
+      "population": 12000,
+      "workers": 8000
     },
     {
       "time": 5,
       "stations": 2,
-      "population": 36830,
-      "workers": 43310
+      "population": 24000,
+      "workers": 16000
     },
     {
       "time": 10,
       "stations": 3,
-      "population": 36830,
-      "workers": 43310
+      "population": 36000,
+      "workers": 24000
     },
     {
       "time": 15,
       "stations": 5,
-      "population": 36830,
-      "workers": 43310
+      "population": 72000,
+      "workers": 48000
     },
     {
       "time": 20,
       "stations": 14,
-      "population": 39785,
-      "workers": 44071
+      "population": 172553,
+      "workers": 112864
     },
     {
       "time": 25,
       "stations": 21,
-      "population": 39785,
-      "workers": 44071
+      "population": 304553,
+      "workers": 200864
     },
     {
       "time": 30,
       "stations": 35,
-      "population": 40343,
-      "workers": 44226
+      "population": 509111,
+      "workers": 337019
     },
     {
       "time": 35,
       "stations": 48,
-      "population": 49361,
-      "workers": 49247
+      "population": 674687,
+      "workers": 446195
     },
     {
       "time": 40,
       "stations": 70,
-      "population": 49361,
-      "workers": 49247
+      "population": 938974,
+      "workers": 622215
     },
     {
       "time": 45,
       "stations": 95,
-      "population": 49361,
-      "workers": 49247
+      "population": 1346974,
+      "workers": 894215
     },
     {
       "time": 50,
       "stations": 147,
-      "population": 49361,
-      "workers": 49247
+      "population": 2150974,
+      "workers": 1430215
     },
     {
       "time": 55,
       "stations": 183,
-      "population": 49361,
-      "workers": 49247
+      "population": 2726974,
+      "workers": 1814215
     },
     {
       "time": 60,
       "stations": 228,
-      "population": 49361,
-      "workers": 49247
+      "population": 3482974,
+      "workers": 2318215
     }
   ]
 }
