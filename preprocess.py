@@ -2,6 +2,8 @@ import os
 import json
 from pathlib import Path
 import pandas as pd
+import geopandas as gpd
+import numpy as np
 
 def main():
     print("[*] Preprocessing started...")
@@ -172,6 +174,98 @@ def main():
     with open(comparison_output, 'w', encoding='utf-8') as f:
         json.dump(comparison_data, f, ensure_ascii=False, indent=2)
     print(f"[+] Saved comparison data to {comparison_output}")
+    
+    # -------------------------------------------------------------
+    # 6. Parcel Data Processing (SHP -> GeoJSON with Zoning Joined)
+    # -------------------------------------------------------------
+    print("[*] Processing parcel data...")
+    p_box_coords = [127.1050, 37.3920, 127.1200, 37.4000]
+    c_box_coords = [126.6380, 37.5330, 126.6580, 37.5470]
+    
+    # Pangyo Parcels
+    p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"
+    p_gdf = gpd.read_file(p_shp).to_crs(epsg=4326)
+    p_box = p_gdf.cx[p_box_coords[0]:p_box_coords[2], p_box_coords[1]:p_box_coords[3]].copy()
+    
+    # Cheongna Parcels
+    c_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_인천_서구" / "LSMD_CONT_LDREG_28260_202606.shp"
+    c_gdf = gpd.read_file(c_shp).to_crs(epsg=4326)
+    c_box = c_gdf.cx[c_box_coords[0]:c_box_coords[2], c_box_coords[1]:c_box_coords[3]].copy()
+    
+    p_pnus = set(p_box['PNU'].dropna().unique())
+    c_pnus = set(c_box['PNU'].dropna().unique())
+    
+    # Match Zoning from CSV
+    print("    Reading Gyeonggi land use CSV in chunks...")
+    p_zoning_dict = {}
+    if pangyo_lu_file.exists():
+        for chunk in pd.read_csv(pangyo_lu_file, usecols=['고유번호', '용도지역지구명'], dtype={'고유번호': str}, chunksize=500000, encoding='cp949'):
+            matched = chunk[chunk['고유번호'].isin(p_pnus)]
+            if len(matched) > 0:
+                for idx, row in matched.iterrows():
+                    pnu = row['고유번호']
+                    zone = row['용도지역지구명']
+                    if pd.notna(zone):
+                        p_zoning_dict.setdefault(pnu, set()).add(zone)
+                        
+    p_zoning = {k: ", ".join(sorted(list(v))) for k, v in p_zoning_dict.items()}
+    
+    print("    Reading Incheon land use CSV in chunks...")
+    c_zoning_dict = {}
+    if cheongna_lu_file.exists():
+        for chunk in pd.read_csv(cheongna_lu_file, usecols=['고유번호', '용도지역지구명'], dtype={'고유번호': str}, chunksize=500000, encoding='cp949'):
+            matched = chunk[chunk['고유번호'].isin(c_pnus)]
+            if len(matched) > 0:
+                for idx, row in matched.iterrows():
+                    pnu = row['고유번호']
+                    zone = row['용도지역지구명']
+                    if pd.notna(zone):
+                        c_zoning_dict.setdefault(pnu, set()).add(zone)
+                        
+    c_zoning = {k: ", ".join(sorted(list(v))) for k, v in c_zoning_dict.items()}
+    
+    p_box['zoning'] = p_box['PNU'].map(p_zoning).fillna("지정정보없음")
+    c_box['zoning'] = c_box['PNU'].map(c_zoning).fillna("지정정보없음")
+    
+    def to_geojson(gdf):
+        features = []
+        for idx, row in gdf.iterrows():
+            geom = row['geometry']
+            pnu = row['PNU']
+            jibun = row['JIBUN']
+            zoning = row['zoning']
+            
+            feature = {
+                "type": "Feature",
+                "geometry": json.loads(gpd.GeoSeries([geom]).to_json())['features'][0]['geometry'],
+                "properties": {
+                    "pnu": pnu,
+                    "jibun": jibun,
+                    "zoning": zoning
+                }
+            }
+            features.append(feature)
+        return {"type": "FeatureCollection", "features": features}
+
+    p_geojson = to_geojson(p_box)
+    c_geojson = to_geojson(c_box)
+    
+    # Save outputs to both root and docs
+    p_out = workspace_dir / "pangyo_parcels.geojson"
+    c_out = workspace_dir / "cheongna_parcels.geojson"
+    
+    with open(p_out, "w", encoding="utf-8") as f:
+        json.dump(p_geojson, f, ensure_ascii=False, indent=2)
+    with open(c_out, "w", encoding="utf-8") as f:
+        json.dump(c_geojson, f, ensure_ascii=False, indent=2)
+        
+    with open(docs_dir / "pangyo_parcels.geojson", "w", encoding="utf-8") as f:
+        json.dump(p_geojson, f, ensure_ascii=False, indent=2)
+    with open(docs_dir / "cheongna_parcels.geojson", "w", encoding="utf-8") as f:
+        json.dump(c_geojson, f, ensure_ascii=False, indent=2)
+        
+    print(f"[+] Saved Pangyo parcels to {p_out} and docs/")
+    print(f"[+] Saved Cheongna parcels to {c_out} and docs/")
     
     print("[+] Preprocessing successfully completed!")
 

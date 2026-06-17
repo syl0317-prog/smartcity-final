@@ -25,10 +25,10 @@
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       
-      --accent-pangyo: #0284c7;
-      --accent-pangyo-glow: rgba(2, 132, 199, 0.15);
-      --accent-cheongna: #ec4899;
-      --accent-cheongna-glow: rgba(236, 72, 153, 0.15);
+      --accent-pangyo: #38bdf8;
+      --accent-pangyo-glow: rgba(56, 189, 248, 0.15);
+      --accent-cheongna: #f472b6;
+      --accent-cheongna-glow: rgba(244, 114, 182, 0.15);
       
       --color-30m: #ef4444;
       --color-30m-fill: rgba(239, 68, 68, 0.2);
@@ -191,7 +191,7 @@
     /* 3. Dashboard Body Grid */
     .dashboard-grid {
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: 1fr 420px;
       gap: 1.5rem;
       padding: 1rem 2rem 2rem 2rem;
       flex: 1;
@@ -229,6 +229,7 @@
 
     .tab-btn:hover {
       color: var(--text-main);
+      background-color: rgba(255, 255, 255, 0.02);
     }
 
     .tab-btn.active[data-tab="pangyo"] {
@@ -243,6 +244,12 @@
       box-shadow: 0 4px 12px var(--accent-cheongna-glow);
     }
 
+    .tab-btn.active[data-tab="split"] {
+      background: linear-gradient(135deg, var(--accent-pangyo) 0%, var(--accent-cheongna) 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(129, 140, 248, 0.25);
+    }
+
     /* Map card & containers */
     .map-card {
       background-color: var(--card-bg);
@@ -255,20 +262,104 @@
       position: relative;
     }
 
-    .map-container {
-      height: 550px;
+    .map-wrapper-single {
+      display: block;
       width: 100%;
+      height: 580px;
+      position: relative;
     }
 
-    .map-legend {
-      background-color: rgba(21, 27, 44, 0.9);
-      border-top: 1px solid var(--panel-border);
-      padding: 0.8rem 1.2rem;
+    .map-wrapper-split {
       display: flex;
-      flex-wrap: wrap;
-      gap: 1.25rem;
-      font-size: 0.75rem;
+      flex-direction: row;
+      width: 100%;
+      height: 580px;
+      gap: 2px;
+      background-color: var(--panel-border);
+      position: relative;
+    }
+
+    .map-container {
+      flex: 1;
+      height: 100% !important;
+      position: relative;
+    }
+
+    /* Info overlays on maps */
+    .map-overlay-info {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1rem;
       z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--panel-border);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      width: 200px;
+      pointer-events: none;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .map-overlay-info h4 {
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 0.4rem;
+      font-size: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 4px;
+    }
+
+    .map-container:nth-child(2) .map-overlay-info h4 {
+      color: #f472b6;
+    }
+
+    .info-stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 0.25rem 0;
+      color: var(--text-muted);
+    }
+
+    .info-stat-row span.val {
+      font-family: var(--font-display);
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* Time filter buttons */
+    .time-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.4rem 0.85rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .time-btn:hover {
+      color: var(--text-main);
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .time-btn.active {
+      background-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(56, 189, 248, 0.3);
+    }
+
+    /* Map legends */
+    .map-legend {
+      background-color: rgba(21, 27, 44, 0.95);
+      border-top: 1px solid var(--panel-border);
+      padding: 1rem 1.25rem;
+      z-index: 1000;
+      font-size: 0.75rem;
     }
 
     .legend-item {
@@ -282,6 +373,17 @@
       width: 12px;
       height: 12px;
       border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--panel-border);
+      padding-top: 0.75rem;
+      width: 100%;
     }
 
     /* Right Stats/Charts column */
@@ -307,18 +409,38 @@
       font-weight: 700;
       color: #f8fafc;
       letter-spacing: -0.01em;
-      border-left: 3px solid #38bdf8;
+      border-left: 3px solid #818cf8;
       padding-left: 0.5rem;
     }
 
-    .chart-card.cheongna-active h3 {
-      border-left-color: #f472b6;
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 3px solid #818cf8;
+      padding-left: 0.5rem;
+    }
+
+    .chart-header h3 {
+      border-left: none;
+      padding-left: 0;
+    }
+
+    .chart-select {
+      background-color: #111726;
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
     }
 
     .chart-wrapper {
       position: relative;
       width: 100%;
-      height: 200px;
+      height: 220px;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -338,6 +460,7 @@
       border-radius: 6px;
       pointer-events: none;
       font-size: 0.75rem;
+      box-shadow: var(--shadow-lg);
     }
 
     .map-overlay-badge h4 {
@@ -398,7 +521,7 @@
     }
 
     /* Responsive adjustments */
-    @media (max-width: 1024px) {
+    @media (max-width: 1200px) {
       .dashboard-grid {
         grid-template-columns: 1fr;
       }
@@ -407,12 +530,29 @@
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
       }
+      .stats-column > div:last-child {
+        grid-column: span 2;
+      }
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
+      .map-wrapper-split {
+        flex-direction: column;
+        height: 800px;
+      }
+      .map-wrapper-split .map-container {
+        width: 100% !important;
+        height: 400px !important;
+      }
       .stats-column {
         grid-template-columns: 1fr;
       }
+      .stats-column > div:last-child {
+        grid-column: span 1;
+      }
+    }
+
+    @media (max-width: 640px) {
       header {
         padding: 1rem;
       }
@@ -457,7 +597,7 @@
   <!-- Global Comparison Card -->
   <section class="comparison-section">
     <div class="comparison-card">
-      <h2>📊 인구 / 종사자 / 직주비 종합 비교표</h2>
+      <h2>📊 인구 / 종사자 / 대중교통 접근성 종합 비교표 (3-1~3-3)</h2>
       <table class="comparison-table">
         <thead>
           <tr>
@@ -493,6 +633,27 @@
             <td class="val-pangyo" id="table-pangyo-buildings">-</td>
             <td class="val-cheongna" id="table-cheongna-buildings">-</td>
           </tr>
+          <!-- 3-3 Isochrone Transit Reachability Rows -->
+          <tr style="background-color: rgba(239, 68, 68, 0.03);">
+            <td class="indicator-label" style="color: var(--color-30m); font-weight: 700;">⏱️ 30분 등시간권 도달 인구 (대중교통)</td>
+            <td class="val-pangyo" id="table-pangyo-pop30">-</td>
+            <td class="val-cheongna" id="table-cheongna-pop30">-</td>
+          </tr>
+          <tr style="background-color: rgba(239, 68, 68, 0.03);">
+            <td class="indicator-label" style="color: var(--color-30m); font-weight: 700;">⏱️ 30분 등시간권 도달 종사자수 (대중교통)</td>
+            <td class="val-pangyo" id="table-pangyo-work30">-</td>
+            <td class="val-cheongna" id="table-cheongna-work30">-</td>
+          </tr>
+          <tr style="background-color: rgba(245, 158, 11, 0.03);">
+            <td class="indicator-label" style="color: var(--color-60m); font-weight: 700;">⏱️ 60분 등시간권 도달 인구 (대중교통)</td>
+            <td class="val-pangyo" id="table-pangyo-pop60">-</td>
+            <td class="val-cheongna" id="table-cheongna-pop60">-</td>
+          </tr>
+          <tr style="background-color: rgba(245, 158, 11, 0.03);">
+            <td class="indicator-label" style="color: var(--color-60m); font-weight: 700;">⏱️ 60분 등시간권 도달 종사자수 (대중교통)</td>
+            <td class="val-pangyo" id="table-pangyo-work60">-</td>
+            <td class="val-cheongna" id="table-cheongna-work60">-</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -503,47 +664,91 @@
     
     <!-- Left Column: Tabs, Map -->
     <section class="map-column">
-      <div class="tab-selector">
-        <button class="tab-btn active" data-tab="pangyo">판교 테크노밸리 생활권</button>
-        <button class="tab-btn" data-tab="cheongna">청라 국제업무지구 생활권</button>
+      <div class="control-row" style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.25rem;">
+        <div class="tab-selector">
+          <button class="tab-btn active" data-tab="pangyo">판교 생활권</button>
+          <button class="tab-btn" data-tab="cheongna">청라 생활권</button>
+          <button class="tab-btn" data-tab="split">나란히 보기 (Side-by-Side)</button>
+        </div>
+        
+        <div class="time-selector" style="display: flex; background-color: rgba(255, 255, 255, 0.03); padding: 0.3rem; border-radius: 8px; border: 1px solid var(--panel-border); gap: 0.2rem;">
+          <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); padding: 0.4rem 0.5rem; display: flex; align-items: center;">⏱️ 등시간권 시간대:</span>
+          <button class="time-btn" data-time="30">30분</button>
+          <button class="time-btn" data-time="60">60분</button>
+          <button class="time-btn active" data-time="all">전체 (30/60분)</button>
+        </div>
       </div>
 
       <div class="map-card">
-        <!-- Map Overlay Badges -->
-        <div id="badge-pangyo" class="map-overlay-badge badge-pangyo">
-          <h4>판교 분석 권역</h4>
-          <p style="color: var(--text-muted); font-size: 0.65rem;">판교역 중심 반경</p>
+        <!-- Map Container Wrapper -->
+        <div id="map-wrapper" class="map-wrapper-single">
+          <!-- Pangyo Map -->
+          <div id="map-pangyo" class="map-container">
+            <div id="badge-pangyo" class="map-overlay-badge badge-pangyo">
+              <h4>판교 분석 권역</h4>
+              <p style="color: var(--text-muted); font-size: 0.65rem;">판교역 중심 반경</p>
+            </div>
+            <div id="info-panel-pangyo" class="map-overlay-info">
+              <h4>🚇 대중교통 등시간권 도달력</h4>
+              <div class="info-stat-row"><span>도달 가능 역</span><span id="stat-pangyo-stations" class="val">-</span></div>
+              <div class="info-stat-row"><span>도달가능 인구</span><span id="stat-pangyo-pop" class="val">-</span></div>
+              <div class="info-stat-row"><span>도달가능 종사자</span><span id="stat-pangyo-work" class="val">-</span></div>
+            </div>
+          </div>
+          
+          <!-- Cheongna Map -->
+          <div id="map-cheongna" class="map-container hidden">
+            <div id="badge-cheongna" class="map-overlay-badge badge-cheongna">
+              <h4>청라 분석 권역</h4>
+              <p style="color: var(--text-muted); font-size: 0.65rem;">청라국제도시역 중심 반경</p>
+            </div>
+            <div id="info-panel-cheongna" class="map-overlay-info">
+              <h4>🚇 대중교통 등시간권 도달력</h4>
+              <div class="info-stat-row"><span>도달 가능 역</span><span id="stat-cheongna-stations" class="val">-</span></div>
+              <div class="info-stat-row"><span>도달가능 인구</span><span id="stat-cheongna-pop" class="val">-</span></div>
+              <div class="info-stat-row"><span>도달가능 종사자</span><span id="stat-cheongna-work" class="val">-</span></div>
+            </div>
+          </div>
         </div>
-        <div id="badge-cheongna" class="map-overlay-badge badge-cheongna hidden">
-          <h4>청라 분석 권역</h4>
-          <p style="color: var(--text-muted); font-size: 0.65rem;">인천 서구 청라동</p>
-        </div>
-
-        <!-- Maps -->
-        <div id="map-pangyo" class="map-container"></div>
-        <div id="map-cheongna" class="map-container hidden"></div>
 
         <!-- Legend -->
-        <div class="map-legend">
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: var(--color-30m);"></div>
-            <span>30분 대중교통 등시간선 (Isochrone)</span>
+        <div class="map-legend" style="display: flex; flex-direction: column; gap: 0.5rem; align-items: stretch;">
+          <div style="display: flex; flex-wrap: wrap; gap: 1.25rem;">
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: var(--color-30m);"></div>
+              <span>30분 대중교통 등시간권 (Isochrone)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: var(--color-60m);"></div>
+              <span>60분 대중교통 등시간선 (Isochrone)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: rgba(56, 189, 248, 0.1); border: 2px solid #38bdf8;"></div>
+              <span>판교 분석 대상 구역</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: rgba(244, 114, 182, 0.1); border: 2px solid #f472b6;"></div>
+              <span>청라 분석 대상 구역</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #ffffff; border: 2px solid #ef4444; border-radius: 50%;"></div>
+              <span>도달 지하철역 (클릭 시 소요시간 표시)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="border: 1.5px dashed #475569; background-color: rgba(71, 85, 105, 0.1);"></div>
+              <span>필지 경계 (지번/용도지역)</span>
+            </div>
           </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: var(--color-60m);"></div>
-            <span>60분 대중교통 등시간선 (Isochrone)</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: rgba(56, 189, 248, 0.15); border: 2px solid #38bdf8;"></div>
-            <span>판교 분석 대상 구역 (사각형 범위)</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: rgba(244, 114, 182, 0.15); border: 2px solid #f472b6;"></div>
-            <span>청라 분석 대상 구역 (사각형 범위)</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #ffffff; border: 2px solid #ef4444; border-radius: 50%;"></div>
-            <span>도달 지하철역</span>
+          
+          <div class="legend-grid">
+            <div class="legend-item"><div class="legend-color" style="background-color: #4ade80;"></div><span>공동주택</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #a3e635;"></div><span>단독주택</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #38bdf8;"></div><span>업무시설 (오피스)</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #fb923c;"></div><span>근린생활시설 (1종/2종)</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #f87171;"></div><span>판매시설 (상업)</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #c084fc;"></div><span>교육연구시설 (학교)</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #a78bfa;"></div><span>공장/창고</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #94a3b8;"></div><span>기타 용도</span></div>
           </div>
         </div>
       </div>
@@ -552,19 +757,34 @@
     <!-- Right Column: Charts -->
     <section class="stats-column">
       
-      <!-- Chart Card 1: Building Use Pie -->
-      <div class="chart-card" id="card-uses">
-        <h3>🏢 주요 건축물 주용도 비율</h3>
+      <!-- Chart Card 1: Building Use Grouped Bar -->
+      <div class="chart-card">
+        <h3>🏢 주요 건축물 주용도 분포 비교 (3-2)</h3>
         <div class="chart-wrapper">
           <canvas id="use-chart"></canvas>
         </div>
       </div>
 
-      <!-- Chart Card 2: Land Use Zone Bar -->
-      <div class="chart-card" id="card-zones">
-        <h3>🌱 용도지역지구 지정 분포</h3>
+      <!-- Chart Card 2: Land Use Zone Grouped Bar -->
+      <div class="chart-card">
+        <h3>🌱 용도지역지구 지정 분포 비교 (3-2)</h3>
         <div class="chart-wrapper">
           <canvas id="zone-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart Card 3: Cumulative Accessibility Line -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>📈 누적 대중교통 접근성 곡선 (3-3)</h3>
+          <select id="accessibility-metric" class="chart-select">
+            <option value="population">도달가능 인구수</option>
+            <option value="workers">도달가능 종사자수</option>
+            <option value="stations">도달가능 지하철역수</option>
+          </select>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="accessibility-chart"></canvas>
         </div>
       </div>
 
@@ -578,6 +798,11 @@
     // Global Data objects
     let isochroneData = null;
     let comparisonData = null;
+    let pangyoBuildingsData = null;
+    let cheongnaBuildingsData = null;
+    let accessibilityData = null;
+    let pangyoParcelsData = null;
+    let cheongnaParcelsData = null;
     
     // Centers & Zooms
     const pangyoCenter = [37.3949, 127.1116];
@@ -587,10 +812,32 @@
     // Maps & Layer groups
     const maps = { pangyo: null, cheongna: null };
     
+    // Leaflet Layers
+    const layers = {
+      pangyo: {
+        poly30: null,
+        poly60: null,
+        stationMarkers: L.layerGroup(),
+        buildings: null,
+        parcels: null
+      },
+      cheongna: {
+        poly30: null,
+        poly60: null,
+        stationMarkers: L.layerGroup(),
+        buildings: null,
+        parcels: null
+      }
+    };
+    
+    // Active states
+    let activeTab = 'pangyo'; // 'pangyo' | 'cheongna' | 'split'
+    let activeTime = 'all'; // '30' | '60' | 'all'
+    
     // Charts variables
     let useChart = null;
     let zoneChart = null;
-    let activeTab = 'pangyo';
+    let accessibilityChart = null;
 
     // Formatting numbers
     function formatNumber(num) {
@@ -602,14 +849,12 @@
     function getConvexHull(points) {
       if (points.length < 3) return points;
       
-      // Filter valid points and clone
       const pts = points
         .filter(p => p.lat !== null && p.lng !== null && p.lat !== undefined && p.lng !== undefined)
         .map(p => ({ lat: parseFloat(p.lat), lng: parseFloat(p.lng) }));
         
       if (pts.length < 3) return pts;
       
-      // Sort by longitude (lng), then by latitude (lat)
       pts.sort((a, b) => a.lng - b.lng || a.lat - b.lat);
       
       const lower = [];
@@ -637,6 +882,72 @@
       return (p2.lng - p1.lng) * (p3.lat - p1.lat) - (p2.lat - p1.lat) * (p3.lng - p1.lng);
     }
 
+    // Calculate Isochrone Reachability Stats Dynamically without double counting
+    function getIsochroneStats(stationsList) {
+      const seen = new Set();
+      let pop = 0;
+      let work = 0;
+      let count = 0;
+      
+      stationsList.forEach(s => {
+        if (!seen.has(s.name)) {
+          seen.add(s.name);
+          count++;
+          if (s.population) pop += s.population;
+          if (s.workers) work += s.workers;
+        }
+      });
+      
+      return { stations: count, population: pop, workers: work };
+    }
+
+    // Color definitions for Building Uses
+    function getUseColor(use) {
+      switch(use) {
+        case '공동주택': return '#4ade80';
+        case '단독주택': return '#a3e635';
+        case '업무시설': return '#38bdf8';
+        case '제1종근린생활시설': return '#fb923c';
+        case '제2종근린생활시설': return '#f59e0b';
+        case '판매시설': return '#f87171';
+        case '교육연구시설': return '#c084fc';
+        case '숙박시설': return '#f472b6';
+        case '공장': return '#a78bfa';
+        case '창고시설': return '#78716c';
+        default: return '#94a3b8';
+      }
+    }
+
+    // Popup builder for building features
+    function createBuildingPopupHtml(props) {
+      return `
+        <div class="popup-content" style="min-width: 220px; font-family: 'Inter', sans-serif;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">
+            🏢 ${props.name || '건축물 정보'}
+          </h4>
+          <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.8rem;">
+            <span style="color: #94a3b8;">주용도:</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.use}</span>
+            
+            <span style="color: #94a3b8;">연면적:</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.area ? props.area.toLocaleString() + ' ㎡' : '-'}</span>
+            
+            <span style="color: #94a3b8;">용적률:</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.far ? props.far.toFixed(2) + ' %' : '-'}</span>
+            
+            <span style="color: #94a3b8;">층수:</span>
+            <span style="font-weight: 600; color: #f8fafc;">지상 ${props.floors_up}층 / 지하 ${props.floors_down}층</span>
+            
+            <span style="color: #94a3b8;">사용승인:</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.approved_year}년</span>
+            
+            <span style="color: #94a3b8;">대지위치:</span>
+            <span style="font-size: 0.75rem; color: #cbd5e1; word-break: keep-all; line-height:1.2;">${props.address || '-'}</span>
+          </div>
+        </div>
+      `;
+    }
+
     // Initialize Leaflet Maps
     function initMaps() {
       const mapOptions = {
@@ -648,7 +959,6 @@
       maps.pangyo = L.map('map-pangyo', mapOptions).setView(pangyoCenter, mapZoom);
       maps.cheongna = L.map('map-cheongna', mapOptions).setView(cheongnaCenter, mapZoom);
 
-      // CartoDB Dark Matter tile layer
       const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
       const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
@@ -656,7 +966,7 @@
       L.tileLayer(tileUrl, { attribution: attribution, maxZoom: 19 }).addTo(maps.cheongna);
     }
 
-    // Populate comparison table
+    // Populate comparison table (including new accessibility metrics rows)
     function populateComparisonTable() {
       const demo = comparisonData.demographics;
       document.getElementById('table-pangyo-pop').innerText = formatNumber(demo.pangyo.population) + "명";
@@ -670,75 +980,99 @@
       
       document.getElementById('table-pangyo-buildings').innerText = "4,368동";
       document.getElementById('table-cheongna-buildings').innerText = "2,904동";
+      
+      // Calculate active accessibility values
+      const p30 = getIsochroneStats(isochroneData.pangyo_30);
+      const p60 = getIsochroneStats(isochroneData.pangyo_60);
+      const c30 = getIsochroneStats(isochroneData.cheongna_30);
+      const c60 = getIsochroneStats(isochroneData.cheongna_60);
+      
+      document.getElementById('table-pangyo-pop30').innerText = formatNumber(p30.population) + "명 (" + p30.stations + "개 역)";
+      document.getElementById('table-cheongna-pop30').innerText = formatNumber(c30.population) + "명 (" + c30.stations + "개 역)";
+      
+      document.getElementById('table-pangyo-work30').innerText = formatNumber(p30.workers) + "명";
+      document.getElementById('table-cheongna-work30').innerText = formatNumber(c30.workers) + "명";
+      
+      document.getElementById('table-pangyo-pop60').innerText = formatNumber(p60.population) + "명 (" + p60.stations + "개 역)";
+      document.getElementById('table-cheongna-pop60').innerText = formatNumber(c60.population) + "명 (" + c60.stations + "개 역)";
+      
+      document.getElementById('table-pangyo-work60').innerText = formatNumber(p60.workers) + "명";
+      document.getElementById('table-cheongna-work60').innerText = formatNumber(c60.workers) + "명";
     }
 
-    // Draw Isochrone Polygons and Station Markers (Dynamically computes hull from station lists)
+    // Draw Isochrone Polygons and Station Markers
     function drawIsochrones() {
-      // Helper to draw polygon on map
-      function drawHullPolygon(mapObj, stations, color, fillOpacity, label) {
+      function createHullPolygon(stations, color, fillOpacity, label) {
         const hullPoints = getConvexHull(stations);
         if (hullPoints.length > 0) {
           const hullCoords = hullPoints.map(p => [p.lat, p.lng]);
           hullCoords.push(hullCoords[0]); // Close polygon
-          L.polygon(hullCoords, {
+          return L.polygon(hullCoords, {
             color: color,
             fillColor: color,
             fillOpacity: fillOpacity,
             weight: 2,
             dashArray: color.includes('60m') ? '5, 5' : null
-          }).addTo(mapObj).bindPopup(`<b>${label}</b>`);
+          }).bindPopup(`<b>${label}</b>`);
         }
+        return null;
       }
 
-      // 1. PANGYO Isochrones
-      drawHullPolygon(maps.pangyo, isochroneData.pangyo_60, 'var(--color-60m)', 0.15, "판교역 기준 60분 등시간권");
-      drawHullPolygon(maps.pangyo, isochroneData.pangyo_30, 'var(--color-30m)', 0.22, "판교역 기준 30분 등시간권");
+      // 1. Generate Polygons
+      layers.pangyo.poly30 = createHullPolygon(isochroneData.pangyo_30, 'var(--color-30m)', 0.22, "판교역 기준 30분 등시간권");
+      layers.pangyo.poly60 = createHullPolygon(isochroneData.pangyo_60, 'var(--color-60m)', 0.15, "판교역 기준 60분 등시간권");
       
+      layers.cheongna.poly30 = createHullPolygon(isochroneData.cheongna_30, 'var(--color-30m)', 0.22, "청라국제도시역 기준 30분 등시간권");
+      layers.cheongna.poly60 = createHullPolygon(isochroneData.cheongna_60, 'var(--color-60m)', 0.15, "청라국제도시역 기준 60분 등시간권");
+
+      // 2. Generate Station Markers
       // Plot Pangyo stations
       isochroneData.pangyo_60.forEach(st => {
         const is30 = isochroneData.pangyo_30.some(s => s.id === st.id);
         const color = is30 ? 'var(--color-30m)' : 'var(--color-60m)';
         
-        L.circleMarker([st.lat, st.lng], {
+        const marker = L.circleMarker([st.lat, st.lng], {
           radius: 4.5,
           fillColor: color,
           color: '#ffffff',
           weight: 1,
           fillOpacity: 0.9
-        }).addTo(maps.pangyo).bindPopup(`
+        }).bindPopup(`
           <div class="popup-content">
             <h4 style="font-size:0.9rem; margin-bottom:4px;">🚉 ${st.name}역</h4>
             <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">노선: ${st.line}</p>
             <p style="font-size:0.8rem; font-weight:600; color:${color};">소요 시간: ${st.time_minutes}분</p>
           </div>
         `);
+        marker.time_minutes = st.time_minutes;
+        marker.is30 = is30;
+        layers.pangyo.stationMarkers.addLayer(marker);
       });
 
-      // 2. CHEONGNA Isochrones
-      drawHullPolygon(maps.cheongna, isochroneData.cheongna_60, 'var(--color-60m)', 0.15, "청라국제도시역 기준 60분 등시간권");
-      drawHullPolygon(maps.cheongna, isochroneData.cheongna_30, 'var(--color-30m)', 0.22, "청라국제도시역 기준 30분 등시간권");
-      
       // Plot Cheongna stations
       isochroneData.cheongna_60.forEach(st => {
         const is30 = isochroneData.cheongna_30.some(s => s.id === st.id);
         const color = is30 ? 'var(--color-30m)' : 'var(--color-60m)';
         
-        L.circleMarker([st.lat, st.lng], {
+        const marker = L.circleMarker([st.lat, st.lng], {
           radius: 4.5,
           fillColor: color,
           color: '#ffffff',
           weight: 1,
           fillOpacity: 0.9
-        }).addTo(maps.cheongna).bindPopup(`
+        }).bindPopup(`
           <div class="popup-content">
             <h4 style="font-size:0.9rem; margin-bottom:4px;">🚉 ${st.name}역</h4>
             <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">노선: ${st.line}</p>
             <p style="font-size:0.8rem; font-weight:600; color:${color};">소요 시간: ${st.time_minutes}분</p>
           </div>
         `);
+        marker.time_minutes = st.time_minutes;
+        marker.is30 = is30;
+        layers.cheongna.stationMarkers.addLayer(marker);
       });
       
-      // Special Starting stations highlight
+      // Plot Starting station markers directly to maps (always visible)
       L.circleMarker(pangyoCenter, {
         radius: 9,
         fillColor: '#00f2fe',
@@ -758,107 +1092,449 @@
 
     // Draw Target Bounding Box Rectangles
     function drawTargetRectangles() {
-      // 1. Pangyo Target Rectangle: 37.3920, 127.1050 ~ 37.4000, 127.1200
+      // 1. Pangyo Target Rectangle
       L.rectangle([[37.3920, 127.1050], [37.4000, 127.1200]], {
         color: '#38bdf8',
         fillColor: '#38bdf8',
-        fillOpacity: 0.15,
+        fillOpacity: 0.05,
         weight: 2
-      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역</b><br>범위: 37.3920, 127.1050 ~ 37.4000, 127.1200");
+      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3920, 127.1050 ~ 37.4000, 127.1200");
 
-      // 2. Cheongna Target Rectangle: 37.5330, 126.6380 ~ 37.5470, 126.6580
+      // 2. Cheongna Target Rectangle
       L.rectangle([[37.5330, 126.6380], [37.5470, 126.6580]], {
         color: '#f472b6',
         fillColor: '#f472b6',
-        fillOpacity: 0.15,
+        fillOpacity: 0.05,
         weight: 2
-      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역</b><br>범위: 37.5330, 126.6380 ~ 37.5470, 126.6580");
+      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역 경계</b><br>범위: 37.5330, 126.6380 ~ 37.5470, 126.6580");
     }
 
-    // Init & Update Chart.js Charts
-    function updateCharts(region) {
-      const useData = comparisonData.building_uses[region];
-      const zoneData = comparisonData.land_use_zones[region];
+    // Draw Building Footprint layers with styles & popups
+    function drawBuildings() {
+      // 1. Pangyo Buildings
+      layers.pangyo.buildings = L.geoJSON(pangyoBuildingsData, {
+        style: function(feature) {
+          return {
+            fillColor: getUseColor(feature.properties.use),
+            color: '#0b0f19',
+            weight: 0.5,
+            fillOpacity: 0.8
+          };
+        },
+        onEachFeature: function(feature, layer) {
+          layer.bindPopup(createBuildingPopupHtml(feature.properties));
+          layer.on({
+            mouseover: function(e) {
+              const ly = e.target;
+              ly.setStyle({
+                fillOpacity: 1.0,
+                weight: 1.5,
+                color: '#ffffff'
+              });
+              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                ly.bringToFront();
+              }
+            },
+            mouseout: function(e) {
+              layers.pangyo.buildings.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(maps.pangyo);
+
+      // 2. Cheongna Buildings
+      layers.cheongna.buildings = L.geoJSON(cheongnaBuildingsData, {
+        style: function(feature) {
+          return {
+            fillColor: getUseColor(feature.properties.use),
+            color: '#0b0f19',
+            weight: 0.5,
+            fillOpacity: 0.8
+          };
+        },
+        onEachFeature: function(feature, layer) {
+          layer.bindPopup(createBuildingPopupHtml(feature.properties));
+          layer.on({
+            mouseover: function(e) {
+              const ly = e.target;
+              ly.setStyle({
+                fillOpacity: 1.0,
+                weight: 1.5,
+                color: '#ffffff'
+              });
+              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                ly.bringToFront();
+              }
+            },
+            mouseout: function(e) {
+              layers.cheongna.buildings.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(maps.cheongna);
+    }
+
+    // Popup builder for parcel features
+    function createParcelPopupHtml(props) {
+      return `
+        <div class="popup-content" style="min-width: 220px; font-family: 'Inter', sans-serif;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: #a3e635; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">
+            🌱 필지 지적 정보
+          </h4>
+          <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.8rem;">
+            <span style="color: #94a3b8;">지번:</span>
+            <span style="font-weight: 600; color: #f8fafc;">${props.jibun || '-'}</span>
+            
+            <span style="color: #94a3b8;">용도지역:</span>
+            <span style="font-weight: 600; color: #f8fafc; word-break: keep-all; line-height: 1.3;">${props.zoning || '정보 없음'}</span>
+            
+            <span style="color: #94a3b8;">PNU:</span>
+            <span style="font-size: 0.7rem; color: #cbd5e1; font-family: monospace;">${props.pnu || '-'}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Draw Parcel boundary layers
+    function drawParcels() {
+      // 1. Pangyo Parcels
+      layers.pangyo.parcels = L.geoJSON(pangyoParcelsData, {
+        style: function(feature) {
+          return {
+            fillColor: '#475569',
+            fillOpacity: 0.05,
+            color: '#475569',
+            weight: 1,
+            dashArray: '3, 3'
+          };
+        },
+        onEachFeature: function(feature, layer) {
+          layer.bindPopup(createParcelPopupHtml(feature.properties));
+          layer.on({
+            mouseover: function(e) {
+              const ly = e.target;
+              ly.setStyle({
+                fillOpacity: 0.25,
+                weight: 1.5,
+                color: '#38bdf8'
+              });
+            },
+            mouseout: function(e) {
+              layers.pangyo.parcels.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(maps.pangyo);
+
+      // 2. Cheongna Parcels
+      layers.cheongna.parcels = L.geoJSON(cheongnaParcelsData, {
+        style: function(feature) {
+          return {
+            fillColor: '#475569',
+            fillOpacity: 0.05,
+            color: '#475569',
+            weight: 1,
+            dashArray: '3, 3'
+          };
+        },
+        onEachFeature: function(feature, layer) {
+          layer.bindPopup(createParcelPopupHtml(feature.properties));
+          layer.on({
+            mouseover: function(e) {
+              const ly = e.target;
+              ly.setStyle({
+                fillOpacity: 0.25,
+                weight: 1.5,
+                color: '#f472b6'
+              });
+            },
+            mouseout: function(e) {
+              layers.cheongna.parcels.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(maps.cheongna);
       
-      const themeColors = region === 'pangyo' 
-        ? ['#0284c7', '#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#cbd5e1'] 
-        : ['#db2777', '#ec4899', '#f472b6', '#fbcfe8', '#fce7f3', '#cbd5e1'];
+      // Bring parcels to back so buildings sit on top
+      layers.pangyo.parcels.bringToBack();
+      layers.cheongna.parcels.bringToBack();
+    }
+
+    // Update isochrone overlays and station visibility on maps
+    function updateIsochronesVisibility() {
+      // Clear polygons
+      if (maps.pangyo.hasLayer(layers.pangyo.poly30)) maps.pangyo.removeLayer(layers.pangyo.poly30);
+      if (maps.pangyo.hasLayer(layers.pangyo.poly60)) maps.pangyo.removeLayer(layers.pangyo.poly60);
+      if (maps.cheongna.hasLayer(layers.cheongna.poly30)) maps.cheongna.removeLayer(layers.cheongna.poly30);
+      if (maps.cheongna.hasLayer(layers.cheongna.poly60)) maps.cheongna.removeLayer(layers.cheongna.poly60);
+      
+      // Update by activeTime
+      if (activeTime === '30') {
+        if (layers.pangyo.poly30) layers.pangyo.poly30.addTo(maps.pangyo);
+        if (layers.cheongna.poly30) layers.cheongna.poly30.addTo(maps.cheongna);
         
-      // 1. Update Building Uses Pie Chart
-      const useLabels = Object.keys(useData);
-      const useValues = Object.values(useData);
+        layers.pangyo.stationMarkers.eachLayer(m => {
+          if (m.is30) { if(!maps.pangyo.hasLayer(m)) m.addTo(maps.pangyo); }
+          else { if(maps.pangyo.hasLayer(m)) maps.pangyo.removeLayer(m); }
+        });
+        layers.cheongna.stationMarkers.eachLayer(m => {
+          if (m.is30) { if(!maps.cheongna.hasLayer(m)) m.addTo(maps.cheongna); }
+          else { if(maps.cheongna.hasLayer(m)) maps.cheongna.removeLayer(m); }
+        });
+      } else if (activeTime === '60') {
+        if (layers.pangyo.poly60) layers.pangyo.poly60.addTo(maps.pangyo);
+        if (layers.cheongna.poly60) layers.cheongna.poly60.addTo(maps.cheongna);
+        
+        layers.pangyo.stationMarkers.eachLayer(m => {
+          if (m.time_minutes <= 60) { if(!maps.pangyo.hasLayer(m)) m.addTo(maps.pangyo); }
+          else { if(maps.pangyo.hasLayer(m)) maps.pangyo.removeLayer(m); }
+        });
+        layers.cheongna.stationMarkers.eachLayer(m => {
+          if (m.time_minutes <= 60) { if(!maps.cheongna.hasLayer(m)) m.addTo(maps.cheongna); }
+          else { if(maps.cheongna.hasLayer(m)) maps.cheongna.removeLayer(m); }
+        });
+      } else { // 'all'
+        if (layers.pangyo.poly60) layers.pangyo.poly60.addTo(maps.pangyo);
+        if (layers.pangyo.poly30) layers.pangyo.poly30.addTo(maps.pangyo);
+        if (layers.cheongna.poly60) layers.cheongna.poly60.addTo(maps.cheongna);
+        if (layers.cheongna.poly30) layers.cheongna.poly30.addTo(maps.cheongna);
+        
+        layers.pangyo.stationMarkers.eachLayer(m => { if(!maps.pangyo.hasLayer(m)) m.addTo(maps.pangyo); });
+        layers.cheongna.stationMarkers.eachLayer(m => { if(!maps.cheongna.hasLayer(m)) m.addTo(maps.cheongna); });
+      }
       
-      if (useChart) {
-        useChart.data.labels = useLabels;
-        useChart.data.datasets[0].data = useValues;
-        useChart.data.datasets[0].backgroundColor = themeColors;
-        useChart.update();
+      updateOverlayStats();
+    }
+
+    // Update dynamic stats overlays inside the map containers
+    function updateOverlayStats() {
+      let pList = [], cList = [];
+      if (activeTime === '30') {
+        pList = isochroneData.pangyo_30;
+        cList = isochroneData.cheongna_30;
       } else {
-        const ctx = document.getElementById('use-chart').getContext('2d');
-        useChart = new Chart(ctx, {
-          type: 'doughnut',
+        // For '60' and 'all', show cumulative 60m reach stats
+        pList = isochroneData.pangyo_60;
+        cList = isochroneData.cheongna_60;
+      }
+
+      const pStats = getIsochroneStats(pList);
+      const cStats = getIsochroneStats(cList);
+
+      document.getElementById('stat-pangyo-stations').innerText = formatNumber(pStats.stations) + '개';
+      document.getElementById('stat-pangyo-pop').innerText = formatNumber(pStats.population) + '명';
+      document.getElementById('stat-pangyo-work').innerText = formatNumber(pStats.workers) + '명';
+
+      document.getElementById('stat-cheongna-stations').innerText = formatNumber(cStats.stations) + '개';
+      document.getElementById('stat-cheongna-pop').innerText = formatNumber(cStats.population) + '명';
+      document.getElementById('stat-cheongna-work').innerText = formatNumber(cStats.workers) + '명';
+    }
+
+    // Initialize all comparison charts (Grouped Bar and Line Charts)
+    function initCharts() {
+      // 1. Grouped Bar Chart: Building Uses Comparison
+      const pUses = comparisonData.building_uses.pangyo;
+      const cUses = comparisonData.building_uses.cheongna;
+      
+      const usesSet = new Set([...Object.keys(pUses), ...Object.keys(cUses)]);
+      const usesLabels = Array.from(usesSet);
+      
+      const pUseValues = usesLabels.map(u => pUses[u] || 0);
+      const cUseValues = usesLabels.map(u => cUses[u] || 0);
+      
+      const ctxUse = document.getElementById('use-chart').getContext('2d');
+      useChart = new Chart(ctxUse, {
+        type: 'bar',
+        data: {
+          labels: usesLabels,
+          datasets: [
+            {
+              label: '판교 (Pangyo)',
+              data: pUseValues,
+              backgroundColor: '#38bdf8',
+              borderColor: '#0284c7',
+              borderWidth: 1,
+              borderRadius: 4
+            },
+            {
+              label: '청라 (Cheongna)',
+              data: cUseValues,
+              backgroundColor: '#f472b6',
+              borderColor: '#db2777',
+              borderWidth: 1,
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.raw.toLocaleString() + '동';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              grid: { display: false }
+            },
+            y: {
+              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            }
+          }
+        }
+      });
+
+      // 2. Grouped Bar Chart: Land Use Zones Comparison
+      const pZones = comparisonData.land_use_zones.pangyo;
+      const cZones = comparisonData.land_use_zones.cheongna;
+      
+      const zoneLabels = Array.from(new Set([...Object.keys(pZones), ...Object.keys(cZones)]));
+      const pZoneValues = zoneLabels.map(z => pZones[z] || 0);
+      const cZoneValues = zoneLabels.map(z => cZones[z] || 0);
+      
+      const ctxZone = document.getElementById('zone-chart').getContext('2d');
+      zoneChart = new Chart(ctxZone, {
+        type: 'bar',
+        data: {
+          labels: zoneLabels,
+          datasets: [
+            {
+              label: '판교 (Pangyo)',
+              data: pZoneValues,
+              backgroundColor: '#38bdf8',
+              borderColor: '#0284c7',
+              borderWidth: 1,
+              borderRadius: 4
+            },
+            {
+              label: '청라 (Cheongna)',
+              data: cZoneValues,
+              backgroundColor: '#f472b6',
+              borderColor: '#db2777',
+              borderWidth: 1,
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.raw.toLocaleString() + '건';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              grid: { display: false }
+            },
+            y: {
+              ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+              grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            }
+          }
+        }
+      });
+
+      // 3. Line Chart: Cumulative Accessibility Curve
+      updateAccessibilityChart();
+    }
+
+    // Update line chart with select metric (population, workers, stations)
+    function updateAccessibilityChart() {
+      const metric = document.getElementById('accessibility-metric').value;
+      const xLabels = accessibilityData.pangyo.map(d => d.time + '분');
+      
+      const pY = accessibilityData.pangyo.map(d => d[metric]);
+      const cY = accessibilityData.cheongna.map(d => d[metric]);
+      
+      let unit = '';
+      if (metric === 'population' || metric === 'workers') {
+        unit = '명';
+      } else {
+        unit = '개 역';
+      }
+      
+      const ctxAccess = document.getElementById('accessibility-chart').getContext('2d');
+      
+      if (accessibilityChart) {
+        accessibilityChart.data.labels = xLabels;
+        accessibilityChart.data.datasets[0].data = pY;
+        accessibilityChart.data.datasets[1].data = cY;
+        accessibilityChart.options.plugins.tooltip.callbacks.label = function(context) {
+          return context.dataset.label + ': ' + context.raw.toLocaleString() + unit;
+        };
+        accessibilityChart.update();
+      } else {
+        accessibilityChart = new Chart(ctxAccess, {
+          type: 'line',
           data: {
-            labels: useLabels,
-            datasets: [{
-              data: useValues,
-              backgroundColor: themeColors,
-              borderColor: '#151b2c',
-              borderWidth: 2
-            }]
+            labels: xLabels,
+            datasets: [
+              {
+                label: '판교 (Pangyo)',
+                data: pY,
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                borderWidth: 2.5,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3.5,
+                pointHoverRadius: 6
+              },
+              {
+                label: '청라 (Cheongna)',
+                data: cY,
+                borderColor: '#f472b6',
+                backgroundColor: 'rgba(244, 114, 182, 0.05)',
+                borderWidth: 2.5,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3.5,
+                pointHoverRadius: 6
+              }
+            ]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
               legend: {
-                position: 'right',
-                labels: {
-                  color: '#94a3b8',
-                  font: { size: 9, family: 'Inter' },
-                  boxWidth: 10
+                labels: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return context.dataset.label + ': ' + context.raw.toLocaleString() + unit;
+                  }
                 }
               }
-            }
-          }
-        });
-      }
-
-      // 2. Update Land Use Zones Bar Chart
-      const zoneLabels = Object.keys(zoneData);
-      const zoneValues = Object.values(zoneData);
-      const zoneColors = region === 'pangyo' ? '#0ea5e9' : '#ec4899';
-      
-      if (zoneChart) {
-        zoneChart.data.labels = zoneLabels;
-        zoneChart.data.datasets[0].data = zoneValues;
-        zoneChart.data.datasets[0].backgroundColor = zoneColors;
-        zoneChart.update();
-      } else {
-        const ctx = document.getElementById('zone-chart').getContext('2d');
-        zoneChart = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: zoneLabels,
-            datasets: [{
-              label: '지정 건수',
-              data: zoneValues,
-              backgroundColor: zoneColors,
-              borderRadius: 4
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false }
             },
             scales: {
               x: {
-                ticks: { color: '#94a3b8', font: { size: 8, family: 'Inter' } },
-                grid: { display: false }
+                ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
+                grid: { color: 'rgba(255, 255, 255, 0.03)' }
               },
               y: {
-                ticks: { color: '#94a3b8', font: { size: 8, family: 'Inter' } },
+                ticks: { color: '#94a3b8', font: { size: 9, family: 'Inter' } },
                 grid: { color: 'rgba(255, 255, 255, 0.05)' }
               }
             }
@@ -867,79 +1543,102 @@
       }
     }
 
-    // Toggle active tab (fixed display sizing issues & centering zoom)
+    // Toggle active tab layout (switching between single map and split maps)
     function switchTab(tab) {
       if (tab === activeTab) return;
       activeTab = tab;
       
-      // Update Tab Button styling
+      const wrapper = document.getElementById('map-wrapper');
+      
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
       });
       
-      // Toggle map containers
-      if (tab === 'pangyo') {
+      if (tab === 'split') {
+        // Show both maps side by side
+        document.getElementById('map-pangyo').classList.remove('hidden');
+        document.getElementById('map-cheongna').classList.remove('hidden');
+        
+        wrapper.className = 'map-wrapper-split';
+        
+        // Critical Leaflet refresh
+        maps.pangyo.invalidateSize();
+        maps.cheongna.invalidateSize();
+        
+        maps.pangyo.setView(pangyoCenter, mapZoom);
+        maps.cheongna.setView(cheongnaCenter, mapZoom);
+      } else if (tab === 'pangyo') {
+        // Show only Pangyo map
         document.getElementById('map-pangyo').classList.remove('hidden');
         document.getElementById('map-cheongna').classList.add('hidden');
-        document.getElementById('badge-pangyo').classList.remove('hidden');
-        document.getElementById('badge-cheongna').classList.add('hidden');
         
-        document.getElementById('card-uses').classList.remove('cheongna-active');
-        document.getElementById('card-zones').classList.remove('cheongna-active');
+        wrapper.className = 'map-wrapper-single';
         
-        // Critical: Leaflet sizing bug fix
         maps.pangyo.invalidateSize();
         maps.pangyo.setView(pangyoCenter, mapZoom);
-      } else {
+      } else if (tab === 'cheongna') {
+        // Show only Cheongna map
         document.getElementById('map-pangyo').classList.add('hidden');
         document.getElementById('map-cheongna').classList.remove('hidden');
-        document.getElementById('badge-pangyo').classList.add('hidden');
-        document.getElementById('badge-cheongna').classList.remove('hidden');
         
-        document.getElementById('card-uses').classList.add('cheongna-active');
-        document.getElementById('card-zones').classList.add('cheongna-active');
+        wrapper.className = 'map-wrapper-single';
         
-        // Critical: Leaflet sizing bug fix
         maps.cheongna.invalidateSize();
         maps.cheongna.setView(cheongnaCenter, mapZoom);
       }
-      
-      // Update charts for the newly active region
-      updateCharts(tab);
     }
 
-    // Load all JSON files & run initialization
+    // Load data and run initialization
     async function loadData() {
       try {
-        console.log("[*] Fetching data JSONs...");
-        const [isochroneRes, comparisonRes] = await Promise.all([
+        console.log("[*] Fetching JSON and GeoJSON datasets...");
+        const [isochroneRes, comparisonRes, pangyoGeoRes, cheongnaGeoRes, accessibilityRes, pangyoParcelRes, cheongnaParcelRes] = await Promise.all([
           fetch('subway_isochrone.json'),
-          fetch('comparison_data.json')
+          fetch('comparison_data.json'),
+          fetch('pangyo_buildings.geojson'),
+          fetch('cheongna_buildings.geojson'),
+          fetch('cumulative_accessibility.json'),
+          fetch('pangyo_parcels.geojson'),
+          fetch('cheongna_parcels.geojson')
         ]);
 
-        if (!isochroneRes.ok || !comparisonRes.ok) {
-          throw new Error("데이터 파일을 불러오지 못했습니다. 경로 또는 서버를 확인하십시오.");
+        if (!isochroneRes.ok || !comparisonRes.ok || !pangyoGeoRes.ok || !cheongnaGeoRes.ok || !accessibilityRes.ok || !pangyoParcelRes.ok || !cheongnaParcelRes.ok) {
+          throw new Error("데이터 파일을 불러오지 못했습니다. 경로 및 CORS 정책을 확인하세요.");
         }
 
         isochroneData = await isochroneRes.json();
         comparisonData = await comparisonRes.json();
+        pangyoBuildingsData = await pangyoGeoRes.json();
+        cheongnaBuildingsData = await cheongnaGeoRes.json();
+        accessibilityData = await accessibilityRes.json();
+        pangyoParcelsData = await pangyoParcelRes.json();
+        cheongnaParcelsData = await cheongnaParcelRes.json();
         
         console.log("[+] Data loaded successfully!");
         
-        // 1. Initialize Leaflet Maps
+        // 1. Initialize Maps
         initMaps();
         
-        // 2. Populate demographics table
-        populateComparisonTable();
-        
-        // 3. Render maps layers
+        // 2. Render Isochrones & Markers
         drawIsochrones();
         drawTargetRectangles();
         
-        // 4. Initialize charts
-        updateCharts('pangyo');
+        // 3. Render Building Footprints
+        drawBuildings();
         
-        // Hide loader
+        // 3b. Render Parcel Boundaries
+        drawParcels();
+        
+        // 4. Set Initial Isochrone Overlay Visibility
+        updateIsochronesVisibility();
+        
+        // 5. Populate demographic comparison table
+        populateComparisonTable();
+        
+        // 6. Initialize comparison charts
+        initCharts();
+        
+        // Hide loading screen
         const loader = document.getElementById('loader');
         loader.style.opacity = 0;
         setTimeout(() => loader.classList.add('hidden'), 500);
@@ -950,14 +1649,29 @@
       }
     }
 
-    // Tab buttons event listener
+    // Tab buttons event listeners
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         switchTab(btn.getAttribute('data-tab'));
       });
     });
 
-    // Start everything on load
+    // Time filter button event listeners
+    document.querySelectorAll('.time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeTime = btn.getAttribute('data-time');
+        updateIsochronesVisibility();
+      });
+    });
+
+    // Select metric change event listener
+    document.getElementById('accessibility-metric').addEventListener('change', () => {
+      updateAccessibilityChart();
+    });
+
+    // Run setup on load
     window.addEventListener('DOMContentLoaded', loadData);
   </script>
 </body>
