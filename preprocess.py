@@ -115,8 +115,8 @@ def main():
     # 3. Load Parcel Shapefiles & BBox Filter (to get PNUs first)
     # -------------------------------------------------------------
     print("[*] Loading parcel shapefiles...")
-    p_box_coords = [127.0980, 37.3950, 127.1200, 37.4060]
-    c_box_coords = [126.6350, 37.5330, 126.6630, 37.5490]
+    p_box_coords = [127.0962, 37.3975, 127.1132, 37.4015]
+    c_box_coords = [126.6386, 37.5344, 126.6578, 37.5434]
     
     # Pangyo Parcels
     p_shp = workspace_dir / "필지" / "LSMD_CONT_LDREG_경기_성남시_분당구" / "LSMD_CONT_LDREG_41135_202606.shp"

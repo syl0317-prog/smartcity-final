@@ -805,8 +805,8 @@
     let cheongnaParcelsData = null;
     
     // Centers & Zooms
-    const pangyoCenter = [37.4005, 127.1090];
-    const cheongnaCenter = [37.5410, 126.6490];
+    const pangyoCenter = [37.3995, 127.1047];
+    const cheongnaCenter = [37.5389, 126.6482];
     const pangyoZoom = 15;
     const cheongnaZoom = 14;
 
@@ -1094,20 +1094,20 @@
     // Draw Target Bounding Box Rectangles
     function drawTargetRectangles() {
       // 1. Pangyo Target Rectangle
-      L.rectangle([[37.3950, 127.0980], [37.4060, 127.1200]], {
+      L.rectangle([[37.3975, 127.0962], [37.4015, 127.1132]], {
         color: '#ffffff',
         fillColor: '#38bdf8',
         fillOpacity: 0.02,
         weight: 2.5
-      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3950, 127.0980 ~ 37.4060, 127.1200");
+      }).addTo(maps.pangyo).bindPopup("<b>판교 분석 대상 구역 경계</b><br>범위: 37.3975, 127.0962 ~ 37.4015, 127.1132");
 
       // 2. Cheongna Target Rectangle
-      L.rectangle([[37.5330, 126.6350], [37.5490, 126.6630]], {
+      L.rectangle([[37.5344, 126.6386], [37.5434, 126.6578]], {
         color: '#ffffff',
         fillColor: '#f472b6',
         fillOpacity: 0.02,
         weight: 2.5
-      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역 경계</b><br>범위: 37.5330, 126.6350 ~ 37.5490, 126.6630");
+      }).addTo(maps.cheongna).bindPopup("<b>청라 분석 대상 구역 경계</b><br>범위: 37.5344, 126.6386 ~ 37.5434, 126.6578");
     }
 
     // Draw Building Footprint layers with styles & popups
