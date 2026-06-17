@@ -140,8 +140,8 @@ def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sg
             if pd.isna(lng) or pd.isna(lat) or pd.isna(x_5179) or pd.isna(y_5179):
                 continue
             
-            # Create 1km Buffer
-            buffer_geom = Point(x_5179, y_5179).buffer(1000)
+            # Create 500m Buffer
+            buffer_geom = Point(x_5179, y_5179).buffer(500)
             buffer_gdf = gpd.GeoDataFrame(geometry=[buffer_geom], crs="EPSG:5179")
             
             # Assert CRS
@@ -154,11 +154,6 @@ def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sg
             joined_unique = joined.drop_duplicates(subset=['code'])
             pop_sum = int(joined_unique['population'].sum()) if not joined_unique.empty else 0
             work_sum = int(joined_unique['workers'].sum()) if not joined_unique.empty else 0
-            
-            # Fallback for stations outside the local SGIS data coverage area (synthetic realistic demographics)
-            if pop_sum == 0 and work_sum == 0:
-                pop_sum = 12000
-                work_sum = 8000
             
             results.append({
                 "id": int(node_id),
@@ -173,24 +168,53 @@ def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sg
             })
     return sorted(results, key=lambda x: x['time_seconds'])
 
-def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgis_gdf, base_poly):
-    # Sum of individual station demographics
-    stations_stats = calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sgis_gdf)
+def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgis_gdf, base_poly=None):
+    max_seconds = max_minutes * 60
     
-    if not stations_stats:
-        base_sgis = sgis_gdf[sgis_gdf.geometry.within(base_poly)].copy()
-        unique_joined = base_sgis.drop_duplicates(subset=['code'])
-        pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
-        work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
+    # 1. 각 시간대(30분/60분)에 도달 가능한 역 목록 추출
+    reachable_nodes = []
+    for node_id, seconds in durations_dict.items():
+        if pd.notna(seconds) and not np.isinf(seconds) and seconds <= max_seconds:
+            match = nodes_dataframe[nodes_dataframe['id'] == node_id]
+            if not match.empty:
+                reachable_nodes.append(match.iloc[0])
+                
+    if not reachable_nodes:
         return {
             "stations": 0,
-            "population": pop_sum,
-            "workers": work_sum
+            "population": 0,
+            "workers": 0
         }
         
-    pop_sum = sum(s['population'] for s in stations_stats)
-    work_sum = sum(s['workers'] for s in stations_stats)
-    station_names = set(s['name'] for s in stations_stats)
+    # 2. 각 역 중심점에서 반경 500m 버퍼 생성
+    buffers = []
+    station_names = set()
+    for node_info in reachable_nodes:
+        x_5179 = node_info['x_5179']
+        y_5179 = node_info['y_5179']
+        if pd.isna(x_5179) or pd.isna(y_5179):
+            continue
+        buffers.append(Point(x_5179, y_5179).buffer(500))
+        station_names.add(node_info['statnm'])
+        
+    if not buffers:
+        return {
+            "stations": len(station_names),
+            "population": 0,
+            "workers": 0
+        }
+        
+    # 3. 모든 버퍼를 union(합집합)으로 합쳐서 하나의 폴리곤으로 만들기
+    union_poly = gpd.GeoSeries(buffers).union_all()
+    
+    # 4. 그 폴리곤 안에 중심점이 포함되는 집계구만 선택
+    assert_crs_5179(sgis_gdf)
+    in_union = sgis_gdf[sgis_gdf.geometry.within(union_poly)].copy()
+    
+    # 5. 선택된 집계구 인구/종사자 합산 (각 집계구는 1번만 카운트)
+    unique_in_union = in_union.drop_duplicates(subset=['code'])
+    pop_sum = int(unique_in_union['population'].sum()) if not unique_in_union.empty else 0
+    work_sum = int(unique_in_union['workers'].sum()) if not unique_in_union.empty else 0
     
     return {
         "stations": len(station_names),
@@ -198,33 +222,15 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
         "workers": work_sum
     }
 
-def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf, base_poly):
+def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf, base_poly=None):
     results = []
     for mins in range(0, 65, 5):
-        stations_stats = calculate_station_catchment(durations_dict, mins, nodes_dataframe, sgis_gdf)
-        
-        if not stations_stats:
-            base_sgis = sgis_gdf[sgis_gdf.geometry.within(base_poly)].copy()
-            unique_joined = base_sgis.drop_duplicates(subset=['code'])
-            pop_sum = int(unique_joined['population'].sum()) if not unique_joined.empty else 0
-            work_sum = int(unique_joined['workers'].sum()) if not unique_joined.empty else 0
-            results.append({
-                "time": mins,
-                "stations": 0,
-                "population": pop_sum,
-                "workers": work_sum
-            })
-            continue
-            
-        pop_sum = sum(s['population'] for s in stations_stats)
-        work_sum = sum(s['workers'] for s in stations_stats)
-        station_names = set(s['name'] for s in stations_stats)
-        
+        totals = calculate_isochrone_totals(durations_dict, mins, nodes_dataframe, sgis_gdf)
         results.append({
             "time": mins,
-            "stations": len(station_names),
-            "population": pop_sum,
-            "workers": work_sum
+            "stations": totals["stations"],
+            "population": totals["population"],
+            "workers": totals["workers"]
         })
         
     # Validation check: verify monotonicity
@@ -496,7 +502,7 @@ def main():
         "2308086": "2826012200",
     }
     
-    def build_sgis_gdf_split_centroids(pop_file, work_file, centroids_clipped, centroids_all, default_cent, nodes_df, is_pangyo):
+    def build_sgis_gdf_split_centroids(pop_file, work_file, centroids_clipped, centroids_all, default_cent):
         pop_df = pd.read_csv(pop_file, header=None)
         work_df = pd.read_csv(work_file, header=None)
         
@@ -544,43 +550,10 @@ def main():
                 "geometry": geom
             })
             
-        # Add synthetic SGIS points for stations outside the 5km radius of the local center
-        if is_pangyo:
-            local_center = Point(127.1015, 37.4005)
-        else:
-            local_center = Point(126.6490, 37.5385)
-            
-        center_gdf = gpd.GeoDataFrame(geometry=[local_center], crs="EPSG:4326").to_crs("EPSG:5179")
-        center_geom = center_gdf.geometry.iloc[0]
-        
-        # Keep track of added coordinates to avoid double-adding transfer nodes
-        added_coords = set()
-        
-        for _, row in nodes_df.iterrows():
-            x_5179 = row['x_5179']
-            y_5179 = row['y_5179']
-            node_id = int(row['id'])
-            if pd.isna(x_5179) or pd.isna(y_5179):
-                continue
-                
-            pt = Point(x_5179, y_5179)
-            if pt.distance(center_geom) > 5000:
-                coord_key = (round(x_5179, -1), round(y_5179, -1))
-                if coord_key in added_coords:
-                    continue
-                added_coords.add(coord_key)
-                
-                records.append({
-                    "code": f"syn_{node_id}",
-                    "population": 25000,
-                    "workers": 15000,
-                    "geometry": pt
-                })
-                
         return gpd.GeoDataFrame(records, crs="EPSG:5179")
         
-    p_sgis_gdf = build_sgis_gdf_split_centroids(bundang_pop_file, bundang_work_file, p_dong_centroids_clipped, p_dong_centroids_all, p_default_cent, nodes_df, is_pangyo=True)
-    c_sgis_gdf = build_sgis_gdf_split_centroids(incheon_pop_file, incheon_work_file, c_dong_centroids_clipped, c_dong_centroids_all, c_default_cent, nodes_df, is_pangyo=False)
+    p_sgis_gdf = build_sgis_gdf_split_centroids(bundang_pop_file, bundang_work_file, p_dong_centroids_clipped, p_dong_centroids_all, p_default_cent)
+    c_sgis_gdf = build_sgis_gdf_split_centroids(incheon_pop_file, incheon_work_file, c_dong_centroids_clipped, c_dong_centroids_all, c_default_cent)
     
     # -------------------------------------------------------------
     # 6. Spatial Join: Station Accessibility Buffers & Isochrones
