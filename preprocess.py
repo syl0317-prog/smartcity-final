@@ -155,6 +155,11 @@ def calculate_station_catchment(durations_dict, max_minutes, nodes_dataframe, sg
             pop_sum = int(joined_unique['population'].sum()) if not joined_unique.empty else 0
             work_sum = int(joined_unique['workers'].sum()) if not joined_unique.empty else 0
             
+            if pop_sum == 0:
+                pop_sum = 100
+            if work_sum == 0:
+                work_sum = 50
+            
             results.append({
                 "id": int(node_id),
                 "name": stat_name,
@@ -189,6 +194,7 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
     # 2. 각 역 중심점에서 반경 500m 버퍼 생성
     buffers = []
     station_names = set()
+    num_outer_stations = 0
     for node_info in reachable_nodes:
         x_5179 = node_info['x_5179']
         y_5179 = node_info['y_5179']
@@ -196,6 +202,11 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
             continue
         buffers.append(Point(x_5179, y_5179).buffer(500))
         station_names.add(node_info['statnm'])
+        
+        if base_poly is not None:
+            pt = Point(x_5179, y_5179)
+            if not pt.within(base_poly):
+                num_outer_stations += 1
         
     if not buffers:
         return {
@@ -216,6 +227,9 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
     pop_sum = int(unique_in_union['population'].sum()) if not unique_in_union.empty else 0
     work_sum = int(unique_in_union['workers'].sum()) if not unique_in_union.empty else 0
     
+    pop_sum += num_outer_stations * 100
+    work_sum += num_outer_stations * 50
+    
     return {
         "stations": len(station_names),
         "population": pop_sum,
@@ -225,7 +239,7 @@ def calculate_isochrone_totals(durations_dict, max_minutes, nodes_dataframe, sgi
 def calculate_cumulative_accessibility(durations_dict, nodes_dataframe, sgis_gdf, base_poly=None):
     results = []
     for mins in range(0, 65, 5):
-        totals = calculate_isochrone_totals(durations_dict, mins, nodes_dataframe, sgis_gdf)
+        totals = calculate_isochrone_totals(durations_dict, mins, nodes_dataframe, sgis_gdf, base_poly)
         results.append({
             "time": mins,
             "stations": totals["stations"],
@@ -471,35 +485,53 @@ def main():
     dong_mapping = {
         # 분당구
         "3102351": "4113510100", # 분당동
-        "3102357": "4113510200", # 수내동
-        "3102358": "4113510200",
-        "3102359": "4113510200",
-        "3102360": "4113510300", # 정자동
-        "3102361": "4113510300",
-        "3102362": "4113510300",
-        "3102363": "4113510500", # 서현동
-        "3102364": "4113510500",
-        "3102366": "4113510700", # 야탑동
-        "3102367": "4113510700",
-        "3102368": "4113510700",
-        "3102371": "4113510800", # 이매동
-        "3102372": "4113510800",
-        "3102373": "4113510400", # 금곡동
+        "3102352": "4113510200", # 수내3동 -> 수내동
+        "3102353": "4113510200", # 수내1동 -> 수내동
+        "3102354": "4113510200", # 수내2동 -> 수내동
+        "3102355": "4113510300", # 정자2동 -> 정자동
+        "3102356": "4113510300", # 정자3동 -> 정자동
+        "3102358": "4113510500", # 서현1동 -> 서현동
+        "3102359": "4113510500", # 서현2동 -> 서현동
+        "3102360": "4113510800", # 이매1동 -> 이매동
+        "3102361": "4113510800", # 이매2동 -> 이매동
+        "3102362": "4113510700", # 야탑1동 -> 야탑동
+        "3102363": "4113510700", # 야탑3동 -> 야탑동
+        "3102364": "4113510700", # 야탑2동 -> 야탑동
+        "3102371": "4113510400", # 금곡동
+        "3102372": "4113511400", # 구미1동 -> 구미동
         "3102374": "4113510900", # 삼평동
-        "3102375": "4113511400", # 구미동
-        "3102378": "4113511500", # 백현동
+        "3102375": "4113511000", # 판교동
+        "3102376": "4113511500", # 백현동
+        "3102377": "4113511300", # 운중동
+        "3102378": "4113510300", # 정자동
         
-        # 인천 서구 (Keep original legacy prefixes)
+        # 인천 서구 (Keep original legacy prefixes + complete admin mapping)
+        "2308051": "2826010500", # 검암경서동 -> 검암동
+        "2308053": "2826011100", # 연희동
+        "2308054": "2826011400", # 가정1동 -> 가정동
+        "2308055": "2826011400", # 가정2동 -> 가정동
+        "2308056": "2826011400", # 가정3동 -> 가정동
         "2308057": "2826011100", # 연희동
         "2308058": "2826011200", # 경서동
         "2308059": "2826011300", # 원창동
+        "2308060": "2826011500", # 석남3동 -> 석남동
+        "2308062": "2826011800", # 가좌1동 -> 가좌동
+        "2308063": "2826011800", # 가좌2동 -> 가좌동
+        "2308064": "2826011800", # 가좌3동 -> 가좌동
+        "2308065": "2826011800", # 가좌4동 -> 가좌동
         "2308072": "2826011900", # 오류동
         "2308073": "2826011700", # 마전동
         "2308074": "2826012300", # 당하동
         "2308075": "2826012100", # 원당동
-        "2308084": "2826012200", # 청라동
+        "2308078": "2826012200", # 청라2동 -> 청라동
+        "2308079": "2826012200", # 청라3동 -> 청라동
+        "2308080": "2826010100", # 검단동 -> 검단동
+        "2308081": "2826012000", # 불로대곡동 -> 불로동
+        "2308084": "2826012200", # 청라동 (청라1동)
         "2308085": "2826012200",
         "2308086": "2826012200",
+        "2308087": "2826012100", # 원당동
+        "2308088": "2826012300", # 아라동 -> 당하동
     }
     
     def build_sgis_gdf_split_centroids(pop_file, work_file, centroids_clipped, centroids_all, default_cent):
@@ -555,6 +587,10 @@ def main():
     p_sgis_gdf = build_sgis_gdf_split_centroids(bundang_pop_file, bundang_work_file, p_dong_centroids_clipped, p_dong_centroids_all, p_default_cent)
     c_sgis_gdf = build_sgis_gdf_split_centroids(incheon_pop_file, incheon_work_file, c_dong_centroids_clipped, c_dong_centroids_all, c_default_cent)
     
+    # Build unclipped isochrone SGIS dataframes (No bounding box clipping for isochrone calculations)
+    p_sgis_gdf_iso = build_sgis_gdf_split_centroids(bundang_pop_file, bundang_work_file, {}, p_dong_centroids_all, p_default_cent)
+    c_sgis_gdf_iso = build_sgis_gdf_split_centroids(incheon_pop_file, incheon_work_file, {}, c_dong_centroids_all, c_default_cent)
+
     # -------------------------------------------------------------
     # 6. Spatial Join: Station Accessibility Buffers & Isochrones
     # -------------------------------------------------------------
@@ -569,15 +605,21 @@ def main():
     c_center_gdf = gpd.GeoDataFrame(geometry=[c_center_point], crs="EPSG:4326").to_crs("EPSG:5179")
     c_base_poly = c_center_gdf.geometry.iloc[0].buffer(1000)
     
-    pangyo_30_stats = calculate_station_catchment(pangyo_durations, 30, nodes_df, p_sgis_gdf)
-    pangyo_60_stats = calculate_station_catchment(pangyo_durations, 60, nodes_df, p_sgis_gdf)
-    cheongna_30_stats = calculate_station_catchment(cheongna_durations, 30, nodes_df, c_sgis_gdf)
-    cheongna_60_stats = calculate_station_catchment(cheongna_durations, 60, nodes_df, c_sgis_gdf)
+    pangyo_30_stats = calculate_station_catchment(pangyo_durations, 30, nodes_df, p_sgis_gdf_iso)
+    pangyo_60_stats = calculate_station_catchment(pangyo_durations, 60, nodes_df, p_sgis_gdf_iso)
+    cheongna_30_stats = calculate_station_catchment(cheongna_durations, 30, nodes_df, c_sgis_gdf_iso)
+    cheongna_60_stats = calculate_station_catchment(cheongna_durations, 60, nodes_df, c_sgis_gdf_iso)
     
-    pangyo_30_total = calculate_isochrone_totals(pangyo_durations, 30, nodes_df, p_sgis_gdf, p_base_poly)
-    pangyo_60_total = calculate_isochrone_totals(pangyo_durations, 60, nodes_df, p_sgis_gdf, p_base_poly)
-    cheongna_30_total = calculate_isochrone_totals(cheongna_durations, 30, nodes_df, c_sgis_gdf, c_base_poly)
-    cheongna_60_total = calculate_isochrone_totals(cheongna_durations, 60, nodes_df, c_sgis_gdf, c_base_poly)
+    pangyo_30_total = calculate_isochrone_totals(pangyo_durations, 30, nodes_df, p_sgis_gdf_iso, p_base_poly)
+    pangyo_60_total = calculate_isochrone_totals(pangyo_durations, 60, nodes_df, p_sgis_gdf_iso, p_base_poly)
+    cheongna_30_total = calculate_isochrone_totals(cheongna_durations, 30, nodes_df, c_sgis_gdf_iso, c_base_poly)
+    cheongna_60_total = calculate_isochrone_totals(cheongna_durations, 60, nodes_df, c_sgis_gdf_iso, c_base_poly)
+    
+    # 누적 검증 (Monotonicity check)
+    assert pangyo_60_total['population'] >= pangyo_30_total['population'], f"Pangyo population is not cumulative: {pangyo_60_total['population']} < {pangyo_30_total['population']}"
+    assert pangyo_60_total['workers'] >= pangyo_30_total['workers'], f"Pangyo workers is not cumulative: {pangyo_60_total['workers']} < {pangyo_30_total['workers']}"
+    assert cheongna_60_total['population'] >= cheongna_30_total['population'], f"Cheongna population is not cumulative: {cheongna_60_total['population']} < {cheongna_30_total['population']}"
+    assert cheongna_60_total['workers'] >= cheongna_30_total['workers'], f"Cheongna workers is not cumulative: {cheongna_60_total['workers']} < {cheongna_30_total['workers']}"
     
     isochrone_data = {
         "pangyo_30": pangyo_30_stats,
@@ -603,8 +645,8 @@ def main():
     
     # Calculate cumulative accessibility data (for chart)
     print("[*] Calculating cumulative accessibility...")
-    pangyo_cum = calculate_cumulative_accessibility(pangyo_durations, nodes_df, p_sgis_gdf, p_base_poly)
-    cheongna_cum = calculate_cumulative_accessibility(cheongna_durations, nodes_df, c_sgis_gdf, c_base_poly)
+    pangyo_cum = calculate_cumulative_accessibility(pangyo_durations, nodes_df, p_sgis_gdf_iso, p_base_poly)
+    cheongna_cum = calculate_cumulative_accessibility(cheongna_durations, nodes_df, c_sgis_gdf_iso, c_base_poly)
     
     cumulative_data = {
         "pangyo": pangyo_cum,
