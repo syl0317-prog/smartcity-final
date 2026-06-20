@@ -34,7 +34,7 @@ def calculate_lum(df):
         if any(w in use_name for w in ['단독주택', '공동주택', '아파트', '다세대', '다가구', '기숙사', '주거']):
             return '주거'
         elif any(w in use_name for w in ['업무', '근린생활', '판매', '숙박', '위락', '상업', '오피스텔']):
-            return '상업'
+            return '상업·업무'
         elif any(w in use_name for w in ['위험물', '자동차', '산업']):
             return '공업'
         elif any(w in use_name for w in ['교육연구', '의료', '운동', '문화', '노유자', '공공', '종교', '교육', '과학']):
@@ -743,7 +743,7 @@ def main():
     def categorize_zones(zone_counts):
         categories = {
             "주거지역": 0,
-            "상업지역": 0,
+            "상업·업무지역": 0,
             "공업지역": 0,
             "녹지지역": 0,
             "개발제한구역": 0,
@@ -753,7 +753,7 @@ def main():
             if any(term in zone for term in ["주거", "주택", "준주거"]):
                 categories["주거지역"] += count
             elif any(term in zone for term in ["상업", "업무"]):
-                categories["상업지역"] += count
+                categories["상업·업무지역"] += count
             elif any(term in zone for term in ["공업", "공장", "산업"]):
                 categories["공업지역"] += count
             elif any(term in zone for term in ["녹지", "공원", "보전녹지", "자연녹지"]):
